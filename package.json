@@ -1,0 +1,41 @@
+{
+  "name": "feat-tracking",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "format": "prettier --write \"{app,layout,lib,types}/**/*.{js,ts,tsx,d.ts}\"",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "5.18.0",
+    "@types/node": "20.3.1",
+    "@types/react": "18.2.12",
+    "@types/react-dom": "18.2.5",
+    "chart.js": "4.2.1",
+    "feat-tracking": "link:",
+    "jose": "^6.2.3",
+    "next": "13.5.6",
+    "primeflex": "^3.3.1",
+    "primeicons": "^6.0.1",
+    "primereact": "10.2.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "typescript": "5.1.3",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/xml2js": "^0.4.14",
+    "eslint": "8.43.0",
+    "eslint-config-next": "13.5.6",
+    "prettier": "^2.8.8",
+    "prisma": "5.18.0",
+    "sass": "^1.63.4"
+  }
+}

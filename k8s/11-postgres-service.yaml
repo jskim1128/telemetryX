@@ -1,0 +1,17 @@
+# Headless ClusterIP service that gives stable DNS to the Postgres
+# StatefulSet pod (postgres-0.postgres.feat-tracking.svc.cluster.local).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: feat-tracking
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

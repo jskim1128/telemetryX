@@ -1,0 +1,112 @@
+// Prisma schema for the Feature Tracking app.
+//
+// Uses SQLite by default for zero-config local development. For production
+// (Docker / Kubernetes) the same schema works with PostgreSQL — just change
+// the `provider` to "postgresql" and set DATABASE_URL to a Postgres URL.
+//
+// Why SQLite for dev: no external DB needed, the file lives at
+// ./prisma/dev.db. K8s production still uses the Postgres StatefulSet
+// described in /k8s.
+//
+// Note: `metadata` is stored as a JSON string (text) for portability —
+// SQLite has no native JSON type and Prisma's Json type is unsupported
+// on SQLite. Callers send JSON objects; the API serializes them to a
+// string before writing.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  employeeId  String?  @unique
+  email       String   @unique
+  displayName String?
+  title       String?
+  // Role for RBAC. "admin" can manage everything; "user" is a regular
+  // authenticated user. First user to register is auto-promoted to admin.
+  role        String   @default("user")
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+}
+
+model App {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String?
+  // Hash of the plaintext API key (sha256, hex). Plaintext is never stored.
+  apiKeyHash   String   @unique
+  // First 12 chars of the plaintext key — used to visually identify the key.
+  apiKeyPrefix String
+  ownerEmail   String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  appOpens AppOpenEvent[]
+  features FeatureEvent[]
+  tags     TagEvent[]
+
+  @@index([name])
+  @@index([active])
+}
+
+model AppOpenEvent {
+  id         String   @id @default(cuid())
+  appId      String
+  email      String
+  department String?
+  sessionId  String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([appId, createdAt])
+  @@index([appId, email])
+  @@index([department])
+  @@index([createdAt])
+}
+
+model FeatureEvent {
+  id          String   @id @default(cuid())
+  appId       String
+  featureName String
+  email       String
+  department  String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([appId, featureName, createdAt])
+  @@index([appId, email])
+  @@index([department])
+  @@index([createdAt])
+}
+
+model TagEvent {
+  id         String   @id @default(cuid())
+  appId      String
+  tag        String
+  email      String
+  department String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([appId, tag, createdAt])
+  @@index([appId, email])
+  @@index([department])
+  @@index([createdAt])
+}

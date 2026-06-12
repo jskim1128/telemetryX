@@ -1,0 +1,46 @@
+version: "3.9"
+
+# Local development convenience: Postgres + the app, both with a persistent
+# named volume so data survives `docker-compose down`.
+#
+# Usage:
+#   docker-compose up -d postgres        # just the DB (then `npm run dev` on host)
+#   docker-compose up --build            # full stack (DB + app)
+#
+# Tear down (keep data):       docker-compose down
+# Tear down (delete data too): docker-compose down -v
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: feat
+      POSTGRES_PASSWORD: featpass
+      POSTGRES_DB: feattracking
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U feat -d feattracking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://feat:featpass@postgres:5432/feattracking
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
