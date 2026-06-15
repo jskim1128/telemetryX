@@ -1,23 +1,15 @@
-// Prisma schema for the Feature Tracking app — LOCAL DEVELOPMENT (SQLite).
+// Prisma schema for the Feature Tracking app — PRODUCTION (PostgreSQL).
 //
-// This file is the DEFAULT schema picked up by `prisma` CLI and by
-// `npm run dev` / `npm run build` when no `--schema` flag is passed. It
-// targets SQLite so `npm run dev` works with zero external dependencies;
-// the database file lives at ./prisma/dev.db.
+// This file is used by the Docker image / Kubernetes deployment via the
+// `prisma:*:prod` scripts in package.json and the production entrypoint.
+// Local development uses `prisma/schema.prisma` (SQLite).
 //
-// PRODUCTION (Docker / Kubernetes) uses `prisma/schema.postgres.prisma`
-// instead — selected via the `prisma:*:prod` scripts in package.json and
-// the Docker entrypoint. The two files must be kept in sync; only their
-// `datasource db` blocks differ (sqlite vs. postgresql).
+// IMPORTANT: keep the model definitions in this file in sync with
+// `prisma/schema.prisma`. Only the `datasource db` block should differ.
+// Migrations for this schema live in `prisma/migrations-postgres/`.
 //
-// Migrations are split per provider:
-//   - prisma/migrations/            → SQLite (this schema)
-//   - prisma/migrations-postgres/   → PostgreSQL (schema.postgres.prisma)
-//
-// Note: `metadata` is stored as a JSON string (text) for portability —
-// SQLite has no native JSON type and Prisma's Json type is unsupported
-// on SQLite. Callers send JSON objects; the API serializes them to a
-// string before writing. The Postgres schema mirrors this for parity.
+// `metadata` remains a String (text) so callers behave identically across
+// both providers; the API serializes JSON objects to a string before write.
 
 generator client {
   provider      = "prisma-client-js"
@@ -25,7 +17,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

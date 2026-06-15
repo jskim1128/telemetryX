@@ -21,7 +21,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npx prisma generate
+# Production image uses the PostgreSQL schema. Local dev uses the default
+# (SQLite) schema via `npm run dev` — see package.json scripts.
+RUN npx prisma generate --schema=prisma/schema.postgres.prisma
 RUN npm run build
 
 # ------------------------------------------------------------------
