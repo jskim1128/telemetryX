@@ -8,8 +8,13 @@ metadata:
   namespace: sdsmcv-prd
   labels:
     app.kubernetes.io/name: telemetryx-app
+    e2-project: e2-telemetry
+    e2-environment: PRD
+    e2-criticality: "2"
+    e2-support-contact: Jo.Shin.Kim
+    e2-owner: Jo.Shin.Kim
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: telemetryx-app
@@ -22,6 +27,11 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: telemetryx-app
+        e2-project: e2-telemetry
+        e2-environment: PRD
+        e2-criticality: "2"
+        e2-support-contact: Jo.Shin.Kim
+        e2-owner: Jo.Shin.Kim
     spec:
       containers:
         - name: app
