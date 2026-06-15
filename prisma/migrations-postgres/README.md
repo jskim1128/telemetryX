@@ -6,18 +6,17 @@ which is the SQLite history used by local development.
 
 ## Generate the initial Postgres migration
 
-Run this once against a reachable Postgres (local Docker, port-forwarded
-StatefulSet, or any throwaway DB). Replace the URL as appropriate:
+Run this once against any reachable Postgres (local Docker via
+`docker-compose up -d postgres`, a throwaway DB, or the production
+host at `10.91.26.224`). Replace the URL as appropriate:
 
 ```bash
-# Example: local Docker Postgres
-docker run --rm -d -p 5432:5432 \
-  -e POSTGRES_USER=feat \
-  -e POSTGRES_PASSWORD=pw \
-  -e POSTGRES_DB=feattracking \
-  postgres:16-alpine
+# Example A: local Docker Postgres (via docker-compose.yml)
+DATABASE_URL="postgresql://feat:featpass@localhost:5432/feattracking?schema=public" \
+  npm run prisma:migrate:prod -- --name init
 
-DATABASE_URL="postgresql://feat:pw@localhost:5432/feattracking?schema=public" \
+# Example B: production host (10.91.26.224)
+DATABASE_URL="postgresql://postgres:sandisk-telemetryx@10.91.26.224:5432/postgres?schema=public" \
   npm run prisma:migrate:prod -- --name init
 ```
 
@@ -34,4 +33,5 @@ prisma migrate deploy --schema=prisma/schema.postgres.prisma
 ```
 
 at container start, using the `DATABASE_URL` injected from
-`k8s/20-app-secret.yaml`.
+`k8s/20-app-secret.yaml` (which points at the external Postgres on
+`10.91.26.224`).

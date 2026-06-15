@@ -2,8 +2,8 @@
 
 A web app for tracking usage of your other apps. Built on the
 [Sakai-React](https://github.com/primefaces/sakai-react) admin template
-with a Next.js API layer, Prisma + PostgreSQL persistence, and Kubernetes
-manifests for a stateful deployment.
+with a Next.js API layer, Prisma + PostgreSQL persistence (external DB
+host), and Kubernetes manifests for the application tier.
 
 ## Features
 
@@ -13,8 +13,8 @@ manifests for a stateful deployment.
 - **App Detail** page with charts, recent events, and a *Show App ID & API Key* dialog
 - **Register App** page for developers to initialize a tracked app
 - **Search** across all registered apps
-- Postgres persistence via Kubernetes `StatefulSet` + `PersistentVolumeClaim`
-  so tracking data survives every deployment.
+- Postgres persistence on a dedicated external host (`10.91.26.224`), so
+  tracking data is fully decoupled from the Kubernetes app lifecycle.
 
 ---
 
@@ -107,14 +107,16 @@ Manifests in `k8s/`:
 | File | Resource |
 |---|---|
 | `00-namespace.yaml` | `Namespace: telemetryx` |
-| `10-postgres-secret.yaml` | `Secret: postgres-credentials` (change before prod) |
-| `11-postgres-service.yaml` | Headless `Service: postgres` for DNS |
-| `12-postgres-statefulset.yaml` | `StatefulSet: postgres` + `PVC` (10Gi) |
-| `20-app-secret.yaml` | `Secret: app-secrets` (DATABASE_URL) |
+| `20-app-secret.yaml` | `Secret: app-secrets` (DATABASE_URL → external Postgres on 10.91.26.224) |
 | `21-app-configmap.yaml` | Non-secret env (NODE_ENV, PORT, …) |
 | `22-app-deployment.yaml` | App `Deployment` (2 replicas) |
 | `23-app-service.yaml` | `Service: telemetryx-app` (ClusterIP, port 80) |
 | `24-app-ingress.yaml` | Optional `Ingress` (placeholder host) |
+
+> The PostgreSQL database is no longer hosted inside the cluster. It runs
+> on a dedicated VM at `10.91.26.224:5432`; the previous
+> `10-postgres-secret.yaml`, `11-postgres-service.yaml`, and
+> `12-postgres-statefulset.yaml` manifests have been removed.
 
 ### Deploy
 
@@ -124,7 +126,7 @@ docker build -f docker/Dockerfile -t <registry>/telemetryx:<tag> .
 docker push <registry>/telemetryx:<tag>
 
 # 2. edit k8s/22-app-deployment.yaml -> image: <registry>/telemetryx:<tag>
-# 3. edit k8s/10-postgres-secret.yaml + k8s/20-app-secret.yaml with real passwords
+# 3. edit k8s/20-app-secret.yaml with the real DATABASE_URL for 10.91.26.224
 # 4. edit k8s/24-app-ingress.yaml -> host
 
 # 5. apply manifests
@@ -132,16 +134,14 @@ kubectl apply -f k8s/00-namespace.yaml
 kubectl apply -f k8s/
 ```
 
-### Persistence guarantee
+### Persistence
 
-Tracking data is stored in PostgreSQL, whose data directory is on a
-`PersistentVolume` provisioned via the StatefulSet's `volumeClaimTemplates`.
-The PV is re-attached to the Postgres pod across restarts, image upgrades,
-and redeploys of either the app or the database, so **no data is lost on
-deployment**.
-
-To pin a specific StorageClass, set `storageClassName` in
-`k8s/12-postgres-statefulset.yaml`.
+Tracking data is stored in PostgreSQL on the dedicated host
+`10.91.26.224:5432`. Persistence, backups, and upgrades of the database
+are owned by that host — **not** by Kubernetes — so app rollouts in the
+cluster never touch the data. To rotate the DB credentials or move the
+DB elsewhere, update `DATABASE_URL` in `k8s/20-app-secret.yaml` and
+re-apply the secret.
 
 ### Rolling out app upgrades
 
