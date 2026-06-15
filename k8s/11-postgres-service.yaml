@@ -1,5 +1,5 @@
 # Headless ClusterIP service that gives stable DNS to the Postgres
-# StatefulSet pod (postgres-0.postgres.feat-tracking.svc.cluster.local).
+# StatefulSet pod (postgres-0.postgres.sdsmcv-prd.svc.cluster.local).
 apiVersion: v1
 kind: Service
 metadata:

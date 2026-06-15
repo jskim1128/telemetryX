@@ -4,15 +4,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: feat-tracking-app
+  name: telemetryx-app
   namespace: sdsmcv-prd
   labels:
-    app.kubernetes.io/name: feat-tracking-app
+    app.kubernetes.io/name: telemetryx-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: feat-tracking-app
+      app.kubernetes.io/name: telemetryx-app
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -21,11 +21,11 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: feat-tracking-app
+        app.kubernetes.io/name: telemetryx-app
     spec:
       containers:
         - name: app
-          image: artifactory.sandisk.com:6629/feat-tracking/app:latest
+          image: artifactory.sandisk.com:6629/telemetryx/app:latest
           imagePullPolicy: Always
           ports:
             - name: http
@@ -56,3 +56,5 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+      imagePullSecrets:
+        - name: cv-artifactory-secret

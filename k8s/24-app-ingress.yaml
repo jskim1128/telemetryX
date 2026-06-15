@@ -1,28 +1,21 @@
-# Optional Ingress for external access. Replace the host and configure TLS
-# as needed for your environment. Requires an Ingress controller (e.g.
-# ingress-nginx, traefik) and optionally cert-manager for TLS.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+# Istio VirtualService exposing the app at https://telemetry-x.edge.sandisk.com
+# via the cluster's shared istio-system/default-gateway.
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
 metadata:
-  name: feat-tracking
   namespace: sdsmcv-prd
-  annotations:
-    # ingress-nginx defaults — adjust to your controller
-    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+  name: telemetryx-web
 spec:
-  ingressClassName: nginx
-  rules:
-    - host: feat-tracking.local
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: feat-tracking-app
-                port:
-                  number: 80
-  # tls:
-  #   - hosts:
-  #       - feat-tracking.local
-  #     secretName: feat-tracking-tls
+  hosts:
+    - "telemetry-x.edge.sandisk.com"
+  gateways:
+    - istio-system/default-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: telemetryx-app
+            port:
+              number: 80

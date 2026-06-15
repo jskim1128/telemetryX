@@ -4,11 +4,11 @@ set -e  # exit immediately on error
 
 # -------- CONFIG --------
 REGISTRY="artifactory.sandisk.com:6629"
-IMAGE_NAME="feat-tracking/app"
+IMAGE_NAME="telemetryx/app"
 NAMESPACE="sdsmcv-prd"
 DOCKERFILE="docker/Dockerfile"
 K8S_DIR="k8s"
-DEPLOYMENT="feat-tracking-app"
+DEPLOYMENT="telemetryx-app"
 # ------------------------
 
 # -------- ARG PARSING --------
