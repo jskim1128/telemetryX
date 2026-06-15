@@ -5,7 +5,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: feat-tracking
-  namespace: feat-tracking
+  namespace: sdsmcv-prd
   annotations:
     # ingress-nginx defaults — adjust to your controller
     nginx.ingress.kubernetes.io/proxy-body-size: "1m"

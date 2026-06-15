@@ -4,7 +4,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: feat-tracking
+  namespace: sdsmcv-prd
   labels:
     app.kubernetes.io/name: postgres
 spec:

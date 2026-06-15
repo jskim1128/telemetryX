@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: feat-tracking-app
-  namespace: feat-tracking
+  namespace: sdsmcv-prd
   labels:
     app.kubernetes.io/name: feat-tracking-app
 spec:
@@ -25,9 +25,8 @@ spec:
     spec:
       containers:
         - name: app
-          # Replace with your image: e.g. ghcr.io/<you>/feat-tracking:<tag>
-          image: feat-tracking:latest
-          imagePullPolicy: IfNotPresent
+          image: artifactory.sandisk.com:6629/feat-tracking/app:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3000

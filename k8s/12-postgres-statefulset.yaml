@@ -11,7 +11,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: feat-tracking
+  namespace: sdsmcv-prd
   labels:
     app.kubernetes.io/name: postgres
 spec:
