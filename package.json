@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "prisma generate && next dev",
+    "next:build": "next build",
     "build": "prisma generate && next build",
     "build:prod": "prisma generate --schema=prisma/schema.postgres.prisma && next build",
     "start": "next start",
@@ -25,7 +26,6 @@
     "@types/react": "18.2.12",
     "@types/react-dom": "18.2.5",
     "chart.js": "4.2.1",
-    "telemetryx": "link:",
     "jose": "^6.2.3",
     "next": "13.5.6",
     "primeflex": "^3.3.1",
@@ -33,10 +33,12 @@
     "primereact": "10.2.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "telemetryx": "link:",
     "typescript": "5.1.3",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "@types/react-transition-group": "^4.4.12",
     "@types/xml2js": "^0.4.14",
     "eslint": "8.43.0",
     "eslint-config-next": "13.5.6",

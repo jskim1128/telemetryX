@@ -10,7 +10,7 @@ import { AppMenuItemProps } from '@/types';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 const AppMenuitem = (props: AppMenuItemProps) => {
-    const pathname = usePathname();
+    const pathname = usePathname() ?? '';
     const searchParams = useSearchParams();
     const { activeMenu, setActiveMenu } = useContext(MenuContext);
     const item = props.item;
