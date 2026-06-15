@@ -92,10 +92,10 @@ standalone output and Prisma client. The entrypoint runs
 `prisma migrate deploy` before starting the server.
 
 ```bash
-docker build -f docker/Dockerfile -t feat-tracking:latest .
+docker build -f docker/Dockerfile -t telemetryx:latest .
 docker run --rm -p 3000:3000 \
   -e DATABASE_URL='postgres://feat:featpass@host.docker.internal:5432/feattracking' \
-  feat-tracking:latest
+  telemetryx:latest
 ```
 
 ---
@@ -106,24 +106,24 @@ Manifests in `k8s/`:
 
 | File | Resource |
 |---|---|
-| `00-namespace.yaml` | `Namespace: feat-tracking` |
+| `00-namespace.yaml` | `Namespace: telemetryx` |
 | `10-postgres-secret.yaml` | `Secret: postgres-credentials` (change before prod) |
 | `11-postgres-service.yaml` | Headless `Service: postgres` for DNS |
 | `12-postgres-statefulset.yaml` | `StatefulSet: postgres` + `PVC` (10Gi) |
 | `20-app-secret.yaml` | `Secret: app-secrets` (DATABASE_URL) |
 | `21-app-configmap.yaml` | Non-secret env (NODE_ENV, PORT, …) |
 | `22-app-deployment.yaml` | App `Deployment` (2 replicas) |
-| `23-app-service.yaml` | `Service: feat-tracking-app` (ClusterIP, port 80) |
+| `23-app-service.yaml` | `Service: telemetryx-app` (ClusterIP, port 80) |
 | `24-app-ingress.yaml` | Optional `Ingress` (placeholder host) |
 
 ### Deploy
 
 ```bash
 # 1. build & push the image to a registry your cluster can pull from
-docker build -f docker/Dockerfile -t <registry>/feat-tracking:<tag> .
-docker push <registry>/feat-tracking:<tag>
+docker build -f docker/Dockerfile -t <registry>/telemetryx:<tag> .
+docker push <registry>/telemetryx:<tag>
 
-# 2. edit k8s/22-app-deployment.yaml -> image: <registry>/feat-tracking:<tag>
+# 2. edit k8s/22-app-deployment.yaml -> image: <registry>/telemetryx:<tag>
 # 3. edit k8s/10-postgres-secret.yaml + k8s/20-app-secret.yaml with real passwords
 # 4. edit k8s/24-app-ingress.yaml -> host
 
@@ -146,10 +146,10 @@ To pin a specific StorageClass, set `storageClassName` in
 ### Rolling out app upgrades
 
 ```bash
-docker build -f docker/Dockerfile -t <registry>/feat-tracking:<new-tag> .
-docker push <registry>/feat-tracking:<new-tag>
-kubectl -n feat-tracking set image deploy/feat-tracking-app app=<registry>/feat-tracking:<new-tag>
-kubectl -n feat-tracking rollout status deploy/feat-tracking-app
+docker build -f docker/Dockerfile -t <registry>/telemetryx:<new-tag> .
+docker push <registry>/telemetryx:<new-tag>
+kubectl -n telemetryx set image deploy/telemetryx-app app=<registry>/telemetryx:<new-tag>
+kubectl -n telemetryx rollout status deploy/telemetryx-app
 ```
 
 Migrations run from the container entrypoint (`prisma migrate deploy`) on
