@@ -1,4 +1,4 @@
-# Stateless Next.js app. Two replicas behind a Service.
+# Stateless Next.js app behind a Service.
 # Migrations run via the container entrypoint on each pod start
 # (prisma migrate deploy is idempotent).
 apiVersion: apps/v1
@@ -7,7 +7,7 @@ metadata:
   name: telemetryx-app
   namespace: sdsmcv-prd
   labels:
-    app.kubernetes.io/name: telemetryx-app
+    app: telemetryx-app
     e2-project: e2-telemetry
     e2-environment: PRD
     e2-criticality: "2"
@@ -15,18 +15,17 @@ metadata:
     e2-owner: Jo.Shin.Kim
 spec:
   replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: telemetryx-app
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      app: telemetryx-app
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: telemetryx-app
+        app: telemetryx-app
         e2-project: e2-telemetry
         e2-environment: PRD
         e2-criticality: "2"
@@ -34,37 +33,20 @@ spec:
         e2-owner: Jo.Shin.Kim
     spec:
       containers:
-        - name: app
+        - name: telemetryx-app
           image: artifactory.sandisk.com:6629/telemetryx/app:latest
           imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: 300m
+              memory: 1Gi
           ports:
-            - name: http
-              containerPort: 3000
+            - containerPort: 3000
+              name: telemetryx-app
           envFrom:
             - configMapRef:
                 name: app-config
             - secretRef:
                 name: app-secrets
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            failureThreshold: 6
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            failureThreshold: 5
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: "1"
-              memory: 1Gi
       imagePullSecrets:
         - name: cv-artifactory-secret

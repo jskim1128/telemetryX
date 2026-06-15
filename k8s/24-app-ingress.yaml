@@ -13,9 +13,17 @@ spec:
   http:
     - match:
         - uri:
+            prefix: /assets
+      route:
+        - destination:
+            host: telemetryx-app-service
+            port:
+              number: 80
+    - match:
+        - uri:
             prefix: /
       route:
         - destination:
-            host: telemetryx-app
+            host: telemetryx-app-service
             port:
               number: 80

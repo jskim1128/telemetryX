@@ -1,15 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: telemetryx-app
+  name: telemetryx-app-service
   namespace: sdsmcv-prd
-  labels:
-    app.kubernetes.io/name: telemetryx-app
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: telemetryx-app
+    app: telemetryx-app
   ports:
-    - name: http
+    - name: telemetryx-app
+      protocol: TCP
       port: 80
       targetPort: 3000
