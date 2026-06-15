@@ -13,7 +13,11 @@ COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 # --ignore-scripts so the postinstall (prisma generate) does NOT run here;
 # we run prisma generate explicitly in the builder stage against the prod schema.
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# --config.node-linker=hoisted produces a flat npm-style node_modules so the
+# runtime stage can COPY node_modules/.prisma, @prisma, prisma directly
+# (pnpm's default isolated layout uses symlinks into .pnpm/ which don't
+# survive cross-stage COPY cleanly).
+RUN pnpm install --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
 
 # ------------------------------------------------------------------
 # Stage 2: build
