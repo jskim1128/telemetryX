@@ -5,8 +5,9 @@
 # ------------------------------------------------------------------
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
-# Enable pnpm via corepack (this project uses pnpm — see pnpm-lock.yaml)
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable pnpm via corepack (this project uses pnpm — see pnpm-lock.yaml).
+# Pin to pnpm 9.x: pnpm 10+/11+ require node:sqlite which needs Node 22+.
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
@@ -19,7 +20,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # ------------------------------------------------------------------
 FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
