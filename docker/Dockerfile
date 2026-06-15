@@ -5,26 +5,29 @@
 # ------------------------------------------------------------------
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
+# Enable pnpm via corepack (this project uses pnpm — see pnpm-lock.yaml)
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
-# Use --ignore-scripts so the postinstall (prisma generate) runs after
-# we have the schema files in place (it's done by COPY above).
-RUN npm ci
+# --ignore-scripts so the postinstall (prisma generate) does NOT run here;
+# we run prisma generate explicitly in the builder stage against the prod schema.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ------------------------------------------------------------------
 # Stage 2: build
 # ------------------------------------------------------------------
 FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # Production image uses the PostgreSQL schema. Local dev uses the default
-# (SQLite) schema via `npm run dev` — see package.json scripts.
-RUN npx prisma generate --schema=prisma/schema.postgres.prisma
-RUN npm run build
+# (SQLite) schema via `pnpm dev` — see package.json scripts.
+RUN pnpm exec prisma generate --schema=prisma/schema.postgres.prisma
+RUN pnpm run build
 
 # ------------------------------------------------------------------
 # Stage 3: runtime
