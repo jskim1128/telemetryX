@@ -1,0 +1,19 @@
+# Normalize line endings to avoid CRLF issues on Windows checkouts.
+# Default: let git auto-detect text files and store them as LF.
+* text=auto eol=lf
+
+# Shell scripts and Dockerfiles MUST be LF — they are executed inside Linux
+# containers where CRLF causes "exec: not found" errors at the shebang line.
+*.sh         text eol=lf
+Dockerfile   text eol=lf
+*.Dockerfile text eol=lf
+
+# Binary files — never touch.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary

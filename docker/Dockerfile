@@ -29,15 +29,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# Production image uses the PostgreSQL schema. Local dev uses the default
-# (SQLite) schema via `pnpm dev` — see package.json scripts.
-RUN pnpm exec prisma generate --schema=prisma/schema.postgres.prisma
+# The app targets PostgreSQL (prisma/schema.prisma) for both dev and prod.
+RUN pnpm exec prisma generate
 RUN pnpm run build
 
 # ------------------------------------------------------------------
 # Stage 3: runtime
 # ------------------------------------------------------------------
 FROM node:20-alpine AS runner
+# `nc` (BusyBox netcat) is bundled with alpine and is used by entrypoint.sh
+# to wait for the database to be reachable before running migrations.
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
@@ -62,7 +63,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_module
 
 # Entrypoint runs migrations then starts the server
 COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
+# Strip any CRLF line endings (Windows checkouts) and make executable.
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
