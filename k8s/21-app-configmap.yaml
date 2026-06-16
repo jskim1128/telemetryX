@@ -7,3 +7,8 @@ data:
   NODE_ENV: "production"
   NEXT_TELEMETRY_DISABLED: "1"
   PORT: "3000"
+  # The k8s ingress terminates TLS in front of this app, so the request
+  # reaching users' browsers is HTTPS — set the session cookie's `Secure`
+  # flag here. (Local Docker / docker-compose on http://localhost leaves
+  # COOKIE_SECURE unset, which correctly evaluates to false.)
+  COOKIE_SECURE: "true"

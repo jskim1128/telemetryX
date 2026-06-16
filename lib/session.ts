@@ -42,6 +42,8 @@ export const SESSION_COOKIE_NAME = 'ft_session';
 // 30 days in seconds — used both for the JWT expiry and the cookie Max-Age.
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
+
 export interface SessionPayload extends JWTPayload {
     userId: number;
     email: string;
@@ -90,7 +92,7 @@ export function buildSessionCookie(token: string): string {
     return serializeCookie(SESSION_COOKIE_NAME, token, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        secure: COOKIE_SECURE,
         path: '/',
         maxAge: SESSION_MAX_AGE_SECONDS
     });
@@ -103,7 +105,7 @@ export function buildClearSessionCookie(): string {
     return serializeCookie(SESSION_COOKIE_NAME, '', {
         httpOnly: true,
         sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        secure: COOKIE_SECURE,
         path: '/',
         maxAge: 0
     });
