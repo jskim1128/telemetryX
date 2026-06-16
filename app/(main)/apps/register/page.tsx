@@ -23,7 +23,7 @@ interface CreatedApp {
 const RegisterAppPage = () => {
     const router = useRouter();
     const toast = useRef<Toast>(null);
-    const { user, loading: authLoading } = useAuth();
+    const { loading: authLoading } = useAuth();
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -32,8 +32,6 @@ const RegisterAppPage = () => {
 
     // Collapsible Usage examples panel.
     const [examplesExpanded, setExamplesExpanded] = useState(false);
-
-    const ownerEmail = user?.email ?? '';
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -108,21 +106,8 @@ const RegisterAppPage = () => {
                             </label>
                             <InputTextarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={500} className="w-full" placeholder="What does this app do?" />
                         </div>
-                        <div className="field">
-                            <label htmlFor="ownerEmail" className="block font-medium mb-2">
-                                Owner email
-                            </label>
-                            <InputText
-                                id="ownerEmail"
-                                value={authLoading ? 'Loading…' : ownerEmail}
-                                className="w-full"
-                                readOnly
-                                disabled
-                            />
-                            <small className="text-500">Automatically set to your signed-in account.</small>
-                        </div>
                         <div className="flex justify-content-end">
-                            <Button type="submit" label="Register App" icon="pi pi-check" loading={submitting} disabled={authLoading || !ownerEmail} />
+                            <Button type="submit" label="Register App" icon="pi pi-check" loading={submitting} disabled={authLoading || !name.trim()} />
                         </div>
                     </form>
                 </div>
