@@ -10,8 +10,10 @@ import { Chart } from 'primereact/chart';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
-import { Dropdown } from 'primereact/dropdown';
+import { InputText } from 'primereact/inputtext';
 import { Message } from 'primereact/message';
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { ScrollPanel } from 'primereact/scrollpanel';
 import { SelectButton } from 'primereact/selectbutton';
 import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
@@ -25,25 +27,7 @@ interface AppOption {
     apiKeyPrefix?: string;
     active?: boolean;
     createdAt?: string;
-}
-
-interface OverviewResp {
-    range: { from: string; to: string };
-    overview: {
-        appOpens: number;
-        featureTriggers: number;
-        tagInstances: number;
-        uniqueUsers: number;
-        activeApps: number;
-    };
-    departments: Array<{ department: string; count: number }>;
-    topApps: Array<{ appId: string; name: string; count: number }>;
-    topFeatures: Array<{ featureName: string; count: number }>;
-}
-
-interface SeriesResp {
-    range: { from: string; to: string };
-    series: Array<{ day: string; category: string; count: number }>;
+    eventCounts?: { appOpens: number; features: number; tags: number; total: number };
 }
 
 interface AppStatsResp {
@@ -78,6 +62,8 @@ const CATEGORY_COLORS = {
 };
 
 const PALETTE = ['#42A5F5', '#66BB6A', '#FFA726', '#AB47BC', '#EF5350', '#26C6DA', '#FFCA28', '#8D6E63', '#5C6BC0', '#EC407A'];
+
+const LAST_APP_COOKIE = 'last_viewed_app';
 
 type SeriesCategory = 'app_open' | 'feature' | 'tag';
 
@@ -131,6 +117,25 @@ function effectiveRange(range: [Date | null, Date | null]): { from: Date; to: Da
     return { from, to };
 }
 
+// --- Cookie helpers (1-year persistence) ---
+function readCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.split('; ').find((row) => row.startsWith(`${encodeURIComponent(name)}=`));
+    if (!match) return null;
+    return decodeURIComponent(match.split('=')[1] || '');
+}
+
+function writeCookie(name: string, value: string, maxAgeDays = 365) {
+    if (typeof document === 'undefined') return;
+    const maxAge = maxAgeDays * 24 * 60 * 60;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+}
+
+function clearCookie(name: string) {
+    if (typeof document === 'undefined') return;
+    document.cookie = `${encodeURIComponent(name)}=; path=/; max-age=0; SameSite=Lax`;
+}
+
 const DashboardPage = () => {
     const toast = useRef<Toast>(null);
     const router = useRouter();
@@ -138,26 +143,24 @@ const DashboardPage = () => {
     const appIdFromUrl = searchParams?.get('app') || null;
 
     const [range, setRange] = useState<[Date | null, Date | null]>(defaultRange());
-    const [departmentFilter, setDepartmentFilter] = useState<string | null>(null);
 
     // App list & search
     const [appsList, setAppsList] = useState<AppOption[]>([]);
+    const [appsLoading, setAppsLoading] = useState(true);
     const [searchValue, setSearchValue] = useState<AppOption | string | null>(null);
     const [suggestions, setSuggestions] = useState<AppOption[]>([]);
     const [selectedAppId, setSelectedAppId] = useState<string | null>(appIdFromUrl);
 
-    // Global view state
-    const [overview, setOverview] = useState<OverviewResp | null>(null);
-    const [series, setSeries] = useState<SeriesResp | null>(null);
+    // Selection-page search
+    const [pickerQuery, setPickerQuery] = useState('');
 
     // App-specific view state
     const [appDetail, setAppDetail] = useState<AppDetail | null>(null);
     const [appStats, setAppStats] = useState<AppStatsResp | null>(null);
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     // Line chart category selection (single-series at a time)
-    const [globalSeriesCategory, setGlobalSeriesCategory] = useState<SeriesCategory>('app_open');
     const [appSeriesCategory, setAppSeriesCategory] = useState<SeriesCategory>('app_open');
 
     // Credentials dialog
@@ -165,9 +168,11 @@ const DashboardPage = () => {
     const [rotating, setRotating] = useState(false);
     const [newKey, setNewKey] = useState<string | null>(null);
 
-    // Load apps list once for the search
+    // Load apps list once for the search; if no app is selected, also try
+    // to restore from cookie (preferring URL if both exist).
     useEffect(() => {
         (async () => {
+            setAppsLoading(true);
             try {
                 const res = await fetch('/api/apps', { cache: 'no-store' });
                 const data = await res.json();
@@ -179,18 +184,32 @@ const DashboardPage = () => {
                         ownerEmail: a.ownerEmail,
                         apiKeyPrefix: a.apiKeyPrefix,
                         active: a.active,
-                        createdAt: a.createdAt
+                        createdAt: a.createdAt,
+                        eventCounts: a.eventCounts
                     }));
                     setAppsList(list);
 
-                    // If URL has an app param, pre-select it in the search box
                     if (appIdFromUrl) {
                         const found = list.find((a) => a.id === appIdFromUrl);
                         if (found) setSearchValue(found);
+                    } else {
+                        // No app in URL — try to restore from cookie.
+                        const remembered = readCookie(LAST_APP_COOKIE);
+                        if (remembered) {
+                            const found = list.find((a) => a.id === remembered);
+                            if (found) {
+                                router.replace(`/?app=${remembered}`);
+                                return;
+                            }
+                            // Stale cookie — clear it.
+                            clearCookie(LAST_APP_COOKIE);
+                        }
                     }
                 }
             } catch {
                 // non-fatal
+            } finally {
+                setAppsLoading(false);
             }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,36 +225,11 @@ const DashboardPage = () => {
         } else {
             const found = appsList.find((a) => a.id === appIdFromUrl);
             if (found) setSearchValue(found);
+            // Persist the user's choice for next visit.
+            writeCookie(LAST_APP_COOKIE, appIdFromUrl);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [appIdFromUrl]);
-
-    const loadGlobal = async () => {
-        const eff = effectiveRange(range);
-        if (!eff) return;
-        setLoading(true);
-        try {
-            const qs = new URLSearchParams();
-            qs.set('from', eff.from.toISOString());
-            qs.set('to', eff.to.toISOString());
-            if (departmentFilter) qs.set('department', departmentFilter);
-
-            const [oRes, sRes] = await Promise.all([
-                fetch(`/api/stats/overview?${qs.toString()}`, { cache: 'no-store' }),
-                fetch(`/api/stats/timeseries?${qs.toString()}`, { cache: 'no-store' })
-            ]);
-            const oData = await oRes.json();
-            const sData = await sRes.json();
-            if (!oRes.ok) throw new Error(oData?.error || 'Failed to load overview');
-            if (!sRes.ok) throw new Error(sData?.error || 'Failed to load series');
-            setOverview(oData);
-            setSeries(sData);
-        } catch (err: any) {
-            toast.current?.show({ severity: 'error', summary: 'Error', detail: err.message });
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const loadApp = async (id: string) => {
         const eff = effectiveRange(range);
@@ -263,15 +257,13 @@ const DashboardPage = () => {
         }
     };
 
-    // Load data based on selection
+    // Load data when an app is selected or the range changes.
     useEffect(() => {
         if (selectedAppId) {
             loadApp(selectedAppId);
-        } else {
-            loadGlobal();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedAppId, range, departmentFilter]);
+    }, [selectedAppId, range]);
 
     const search = (event: AutoCompleteCompleteEvent) => {
         const q = (event.query || '').toLowerCase().trim();
@@ -282,21 +274,20 @@ const DashboardPage = () => {
         setSuggestions(appsList.filter((a) => a.name.toLowerCase().includes(q) || (a.ownerEmail || '').toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q)));
     };
 
-    const onSelectApp = (e: AutoCompleteSelectEvent) => {
-        const app = e.value as AppOption;
-        setSelectedAppId(app.id);
-        router.push(`/?app=${app.id}`);
+    const selectApp = (id: string) => {
+        setSelectedAppId(id);
+        writeCookie(LAST_APP_COOKIE, id);
+        router.push(`/?app=${id}`);
     };
 
-    const clearSelection = () => {
-        setSearchValue(null);
-        setSelectedAppId(null);
-        router.push('/');
+    const onSelectApp = (e: AutoCompleteSelectEvent) => {
+        const app = e.value as AppOption;
+        if (!app?.id) return;
+        selectApp(app.id);
     };
 
     const refresh = () => {
         if (selectedAppId) loadApp(selectedAppId);
-        else loadGlobal();
     };
 
     // App-specific actions
@@ -347,17 +338,9 @@ const DashboardPage = () => {
     };
 
     // Build charts
-    const globalLine = useMemo(() => buildLineChart(series?.series, globalSeriesCategory), [series, globalSeriesCategory]);
     const appLine = useMemo(() => buildLineChart(appStats?.series, appSeriesCategory), [appStats, appSeriesCategory]);
-
-    const globalDepartmentChart = useMemo(() => buildDoughnut(overview?.departments || []), [overview]);
     const appDepartmentChart = useMemo(() => buildDoughnut(appStats?.departments || []), [appStats]);
-
-    const topAppsChart = useMemo(() => buildBar((overview?.topApps || []).map((a) => ({ label: a.name, count: a.count })), '#42A5F5'), [overview]);
-    const topFeaturesChart = useMemo(() => buildBar((overview?.topFeatures || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [overview]);
     const appFeatureChart = useMemo(() => buildBar((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [appStats]);
-
-    const departmentOptions = (overview?.departments || []).map((d) => ({ label: d.department, value: d.department }));
 
     const itemTemplate = (item: AppOption) => (
         <div className="flex flex-column">
@@ -366,7 +349,20 @@ const DashboardPage = () => {
         </div>
     );
 
-    const title = selectedAppId ? (appDetail ? appDetail.name : 'Loading…') : 'All Apps Overview';
+    const title = selectedAppId ? (appDetail ? appDetail.name : 'Loading…') : 'Select an app';
+
+    // === EMPTY STATE: app selector ===
+    if (!selectedAppId) {
+        return (
+            <AppPickerView
+                apps={appsList}
+                loading={appsLoading}
+                query={pickerQuery}
+                setQuery={setPickerQuery}
+                onSelect={selectApp}
+            />
+        );
+    }
 
     return (
         <div className="grid">
@@ -387,23 +383,36 @@ const DashboardPage = () => {
                                 field="name"
                                 itemTemplate={itemTemplate}
                                 onChange={(e) => {
-                                    setSearchValue(e.value);
+                                    // Never allow the value to be cleared. If the user
+                                    // tries to empty the field, restore the previous
+                                    // selection on blur via the existing app match.
                                     if (e.value === null || e.value === '') {
-                                        if (selectedAppId) {
-                                            setSelectedAppId(null);
-                                            router.push('/');
-                                        }
+                                        // Keep the current searchValue; ignore the change.
+                                        return;
                                     }
+                                    setSearchValue(e.value);
                                 }}
                                 onSelect={onSelectApp}
-                                placeholder="Search apps by name, owner… (leave empty for all apps)"
+                                placeholder="Search apps by name, owner…"
                                 dropdown
                                 forceSelection
                                 className="w-full"
                                 inputClassName="w-full pl-5"
                             />
                         </span>
-                        {selectedAppId && <Button label="View all apps" icon="pi pi-times" outlined onClick={clearSelection} />}
+                        <Button
+                            label="Switch app"
+                            icon="pi pi-th-large"
+                            outlined
+                            onClick={() => {
+                                // Send the user back to the picker without clearing the cookie.
+                                router.push('/?app=');
+                                setSelectedAppId(null);
+                                setSearchValue(null);
+                                setAppDetail(null);
+                                setAppStats(null);
+                            }}
+                        />
                     </div>
 
                     {/* Title + filters */}
@@ -411,7 +420,7 @@ const DashboardPage = () => {
                         <div className="flex-1">
                             <div className="flex align-items-center gap-2 flex-wrap">
                                 <h3 className="m-0">{title}</h3>
-                                {selectedAppId && appDetail && (appDetail.active ? <Tag severity="success" value="Active" /> : <Tag severity="danger" value="Disabled" />)}
+                                {appDetail && (appDetail.active ? <Tag severity="success" value="Active" /> : <Tag severity="danger" value="Disabled" />)}
                             </div>
                         </div>
                         <div className="field m-0">
@@ -426,106 +435,16 @@ const DashboardPage = () => {
                                 placeholder="Pick a range"
                             />
                         </div>
-                        {!selectedAppId && (
-                            <div className="field m-0">
-                                <label className="block text-500 text-sm mb-1">Department</label>
-                                <Dropdown value={departmentFilter} options={departmentOptions} onChange={(e) => setDepartmentFilter(e.value)} placeholder="All departments" showClear />
-                            </div>
-                        )}
                         <Button icon="pi pi-refresh" onClick={refresh} loading={loading} tooltip="Refresh" />
-                        {selectedAppId && appDetail && (
+                        {appDetail && (
                             <Button icon="pi pi-key" label="Show App ID & API Key" onClick={openCredentials} severity="info" outlined />
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* === GLOBAL VIEW === */}
-            {!selectedAppId && (
-                <>
-                    <KpiCard label="App opens" value={overview?.overview.appOpens ?? 0} icon="pi-sign-in" bg="bg-blue-100" color="text-blue-500" />
-                    <KpiCard label="Feature triggers" value={overview?.overview.featureTriggers ?? 0} icon="pi-bolt" bg="bg-green-100" color="text-green-500" />
-                    <KpiCard label="Tag instances" value={overview?.overview.tagInstances ?? 0} icon="pi-tag" bg="bg-orange-100" color="text-orange-500" />
-                    <KpiCard label="Unique users" value={overview?.overview.uniqueUsers ?? 0} icon="pi-users" bg="bg-purple-100" color="text-purple-500" />
-
-                    <div className="col-12 xl:col-8">
-                        <div className="card h-full flex flex-column">
-                            <div className="flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                                <h5 className="m-0">Events over time</h5>
-                                <SelectButton
-                                    value={globalSeriesCategory}
-                                    options={SERIES_OPTIONS}
-                                    itemTemplate={seriesItemTemplate}
-                                    onChange={(e) => {
-                                        if (e.value) setGlobalSeriesCategory(e.value as SeriesCategory);
-                                    }}
-                                    allowEmpty={false}
-                                />
-                            </div>
-                            <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
-                                <Chart type="line" data={globalLine.data} options={globalLine.options} style={{ height: '100%', width: '100%' }} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="col-12 xl:col-4">
-                        <div className="card h-full flex flex-column">
-                            <h5>Events by department</h5>
-                            <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
-                                {!overview || overview.departments.length === 0 ? (
-                                    <p className="text-500 m-0">No department data in this range.</p>
-                                ) : (
-                                    <Chart type="doughnut" data={globalDepartmentChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} style={{ height: '100%', width: '100%', maxHeight: '320px' }} />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="col-12 lg:col-6">
-                        <div className="card h-full flex flex-column">
-                            <h5>Top apps by events</h5>
-                            <div className="flex-1" style={{ position: 'relative', minHeight: '360px' }}>
-                                {!overview || overview.topApps.length === 0 ? (
-                                    <p className="text-500">No data yet.</p>
-                                ) : (
-                                    <Chart type="bar" data={topAppsChart} options={{ maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }} style={{ height: '100%', width: '100%' }} />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="col-12 lg:col-6">
-                        <div className="card h-full flex flex-column">
-                            <h5>Top features triggered</h5>
-                            <div className="flex-1" style={{ position: 'relative', minHeight: '360px' }}>
-                                {!overview || overview.topFeatures.length === 0 ? (
-                                    <p className="text-500">No feature triggers yet.</p>
-                                ) : (
-                                    <Chart type="bar" data={topFeaturesChart} options={{ maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }} style={{ height: '100%', width: '100%' }} />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="col-12">
-                        <div className="card">
-                            <div className="flex justify-content-between align-items-center mb-3">
-                                <h5 className="m-0">All apps</h5>
-                                <Link href="/apps">
-                                    <Button label="Manage apps" icon="pi pi-arrow-right" iconPos="right" text />
-                                </Link>
-                            </div>
-                            <DataTable value={overview?.topApps || []} emptyMessage="No apps yet." responsiveLayout="scroll">
-                                <Column field="name" header="App" body={(r) => <Link href={`/?app=${r.appId}`}>{r.name}</Link>} />
-                                <Column field="count" header="Total events" sortable />
-                            </DataTable>
-                        </div>
-                    </div>
-                </>
-            )}
-
             {/* === APP-SPECIFIC VIEW === */}
-            {selectedAppId && appStats && (
+            {appStats && (
                 <>
                     <KpiCard label="App opens" value={appStats.overview.appOpens} icon="pi-sign-in" bg="bg-blue-100" color="text-blue-500" />
                     <KpiCard label="Feature triggers" value={appStats.overview.featureTriggers} icon="pi-bolt" bg="bg-green-100" color="text-green-500" />
@@ -690,6 +609,199 @@ function typeLabel(t: string) {
     if (t === 'feature') return 'Feature';
     return 'Tag';
 }
+
+// ============================================================================
+// App Picker (empty-state view shown when no app is selected)
+// ============================================================================
+const AppPickerView = ({
+    apps,
+    loading,
+    query,
+    setQuery,
+    onSelect
+}: {
+    apps: AppOption[];
+    loading: boolean;
+    query: string;
+    setQuery: (v: string) => void;
+    onSelect: (id: string) => void;
+}) => {
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return apps;
+        return apps.filter(
+            (a) =>
+                a.name.toLowerCase().includes(q) ||
+                (a.ownerEmail || '').toLowerCase().includes(q) ||
+                (a.description || '').toLowerCase().includes(q)
+        );
+    }, [apps, query]);
+
+    return (
+        <div className="grid">
+            <div className="col-12">
+                <div className="card">
+                    {/* Hero header */}
+                    <div className="flex flex-column align-items-center text-center mb-5 mt-3">
+                        <div
+                            className="flex align-items-center justify-content-center bg-primary-100 border-circle mb-3"
+                            style={{ width: '4rem', height: '4rem' }}
+                        >
+                            <i className="pi pi-th-large text-primary text-3xl" />
+                        </div>
+                        <h2 className="m-0 mb-2">Choose an app to view</h2>
+                        <p className="text-500 m-0" style={{ maxWidth: '520px' }}>
+                            Pick one of your tracked apps below to see its dashboard. We&apos;ll remember your choice for next time.
+                        </p>
+                    </div>
+
+                    {/* Search */}
+                    {apps.length > 0 && (
+                        <div className="flex justify-content-center mb-4">
+                            <span className="p-input-icon-left" style={{ width: '100%', maxWidth: '420px' }}>
+                                <i className="pi pi-search" />
+                                <InputText
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="Search by name, owner, or description…"
+                                    className="w-full"
+                                    autoFocus
+                                />
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Content */}
+                    {loading ? (
+                        <div className="flex justify-content-center py-6">
+                            <ProgressSpinner style={{ width: '3rem', height: '3rem' }} strokeWidth="4" />
+                        </div>
+                    ) : apps.length === 0 ? (
+                        <div className="flex flex-column align-items-center text-center py-6">
+                            <i className="pi pi-inbox text-500 mb-3" style={{ fontSize: '3rem' }} />
+                            <h4 className="m-0 mb-2">No apps registered yet</h4>
+                            <p className="text-500 mb-4" style={{ maxWidth: '420px' }}>
+                                Register your first app to start tracking app opens, features, and tags.
+                            </p>
+                            <Link href="/apps/register">
+                                <Button label="Register an app" icon="pi pi-plus" />
+                            </Link>
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex flex-column align-items-center text-center py-6">
+                            <i className="pi pi-search text-500 mb-3" style={{ fontSize: '2.5rem' }} />
+                            <p className="text-500 m-0">No apps match &ldquo;{query}&rdquo;.</p>
+                        </div>
+                    ) : (
+                        <ScrollPanel
+                            className="app-picker-scroll"
+                            style={{
+                                width: '100%',
+                                // Fits ~4 rows of cards (~240px each + grid gaps).
+                                // Capped to the viewport so it never makes the
+                                // page itself overly tall on short screens.
+                                height: 'min(calc(4 * 240px + 3rem), 70vh)'
+                            }}
+                        >
+                            <div className="grid pr-2">
+                                {filtered.map((app) => (
+                                    <div key={app.id} className="col-12 sm:col-6 lg:col-4 xl:col-3 flex">
+                                        <AppCard app={app} onSelect={() => onSelect(app.id)} />
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollPanel>
+                    )}
+
+                    {/* Footer hint */}
+                    {apps.length > 0 && (
+                        <div className="flex flex-column align-items-center mt-5 pt-4 border-top-1 surface-border">
+                            <span className="text-500 text-sm mb-2">
+                                <i className="pi pi-question-circle mr-1" />
+                                Can&apos;t find your app? It may not be registered for tracking yet.
+                            </span>
+                            <Link href="/apps/register">
+                                <Button label="Register a new app" icon="pi pi-plus" text />
+                            </Link>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AppCard = ({ app, onSelect }: { app: AppOption; onSelect: () => void }) => {
+    const total = app.eventCounts?.total ?? 0;
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            className="w-full text-left p-3 border-round surface-card border-1 surface-border app-picker-card flex flex-column"
+            style={{
+                cursor: 'pointer',
+                background: 'var(--surface-card)',
+                transition: 'transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease',
+                height: '100%'
+            }}
+            onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)';
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--primary-color)';
+            }}
+            onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.transform = '';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '';
+                (e.currentTarget as HTMLButtonElement).style.borderColor = '';
+            }}
+        >
+            <div className="flex align-items-start justify-content-between mb-3">
+                <div
+                    className="flex align-items-center justify-content-center bg-primary-100 border-round"
+                    style={{ width: '2.5rem', height: '2.5rem' }}
+                >
+                    <i className="pi pi-box text-primary" />
+                </div>
+                {app.active === false ? (
+                    <Tag severity="danger" value="Disabled" />
+                ) : (
+                    <Tag severity="success" value="Active" />
+                )}
+            </div>
+            <div className="font-semibold text-900 mb-1" style={{ fontSize: '1.05rem' }}>
+                {app.name}
+            </div>
+            {app.ownerEmail && (
+                <div className="text-500 text-sm mb-2 white-space-nowrap overflow-hidden text-overflow-ellipsis">
+                    <i className="pi pi-user mr-1" style={{ fontSize: '0.75rem' }} />
+                    {app.ownerEmail}
+                </div>
+            )}
+            {app.description && (
+                <div
+                    className="text-600 text-sm mb-3"
+                    style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {app.description}
+                </div>
+            )}
+            <div className="flex align-items-center justify-content-between mt-auto pt-2 border-top-1 surface-border">
+                <span className="text-500 text-xs">
+                    <i className="pi pi-chart-bar mr-1" />
+                    {total.toLocaleString()} events
+                </span>
+                <span className="text-primary text-sm font-medium">
+                    View <i className="pi pi-arrow-right ml-1" style={{ fontSize: '0.75rem' }} />
+                </span>
+            </div>
+        </button>
+    );
+};
 
 const UsageExamples = ({ apiKey }: { apiKey?: string }) => {
     const [expanded, setExpanded] = useState(false);
