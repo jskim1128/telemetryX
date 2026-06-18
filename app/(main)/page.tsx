@@ -354,8 +354,8 @@ const DashboardPage = () => {
     const appDepartmentChart = useMemo(() => buildDoughnut(appStats?.departments || []), [appStats]);
 
     const topAppsChart = useMemo(() => buildBar((overview?.topApps || []).map((a) => ({ label: a.name, count: a.count })), '#42A5F5'), [overview]);
-    const topFeaturesChart = useMemo(() => buildBar((overview?.topFeatures || []).map((f) => ({ label: f.featureName, count: f.count })), '#66BB6A'), [overview]);
-    const appFeatureChart = useMemo(() => buildBar((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), '#66BB6A'), [appStats]);
+    const topFeaturesChart = useMemo(() => buildBar((overview?.topFeatures || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [overview]);
+    const appFeatureChart = useMemo(() => buildBar((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [appStats]);
 
     const departmentOptions = (overview?.departments || []).map((d) => ({ label: d.department, value: d.department }));
 
@@ -804,10 +804,11 @@ function buildDoughnut(rows: Array<{ department: string; count: number }>) {
     };
 }
 
-function buildBar(rows: Array<{ label: string; count: number }>, color: string) {
+function buildBar(rows: Array<{ label: string; count: number }>, color: string | string[]) {
+    const backgroundColor = Array.isArray(color) ? rows.map((_, i) => color[i % color.length]) : color;
     return {
         labels: rows.map((r) => r.label),
-        datasets: [{ label: 'Count', data: rows.map((r) => r.count), backgroundColor: color }]
+        datasets: [{ label: 'Count', data: rows.map((r) => r.count), backgroundColor }]
     };
 }
 
