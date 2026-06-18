@@ -12,6 +12,7 @@ import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
 import { Dropdown } from 'primereact/dropdown';
 import { Message } from 'primereact/message';
+import { SelectButton } from 'primereact/selectbutton';
 import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
@@ -78,6 +79,27 @@ const CATEGORY_COLORS = {
 
 const PALETTE = ['#42A5F5', '#66BB6A', '#FFA726', '#AB47BC', '#EF5350', '#26C6DA', '#FFCA28', '#8D6E63', '#5C6BC0', '#EC407A'];
 
+type SeriesCategory = 'app_open' | 'feature' | 'tag';
+
+const SERIES_OPTIONS: Array<{ label: string; value: SeriesCategory; icon: string }> = [
+    { label: 'App opens', value: 'app_open', icon: 'pi pi-sign-in' },
+    { label: 'Feature triggers', value: 'feature', icon: 'pi pi-bolt' },
+    { label: 'Tags', value: 'tag', icon: 'pi pi-tag' }
+];
+
+const SERIES_LABEL: Record<SeriesCategory, string> = {
+    app_open: 'App opens',
+    feature: 'Feature triggers',
+    tag: 'Tags'
+};
+
+const seriesItemTemplate = (option: { label: string; value: SeriesCategory; icon: string }) => (
+    <span className="flex align-items-center gap-2">
+        <i className={option.icon}></i>
+        <span>{option.label}</span>
+    </span>
+);
+
 function defaultRange(): [Date, Date] {
     const to = new Date();
     const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -133,6 +155,10 @@ const DashboardPage = () => {
     const [appStats, setAppStats] = useState<AppStatsResp | null>(null);
 
     const [loading, setLoading] = useState(true);
+
+    // Line chart category selection (single-series at a time)
+    const [globalSeriesCategory, setGlobalSeriesCategory] = useState<SeriesCategory>('app_open');
+    const [appSeriesCategory, setAppSeriesCategory] = useState<SeriesCategory>('app_open');
 
     // Credentials dialog
     const [credsOpen, setCredsOpen] = useState(false);
@@ -321,8 +347,8 @@ const DashboardPage = () => {
     };
 
     // Build charts
-    const globalLine = useMemo(() => buildLineChart(series?.series), [series]);
-    const appLine = useMemo(() => buildLineChart(appStats?.series), [appStats]);
+    const globalLine = useMemo(() => buildLineChart(series?.series, globalSeriesCategory), [series, globalSeriesCategory]);
+    const appLine = useMemo(() => buildLineChart(appStats?.series, appSeriesCategory), [appStats, appSeriesCategory]);
 
     const globalDepartmentChart = useMemo(() => buildDoughnut(overview?.departments || []), [overview]);
     const appDepartmentChart = useMemo(() => buildDoughnut(appStats?.departments || []), [appStats]);
@@ -350,67 +376,67 @@ const DashboardPage = () => {
             {/* Search + Title + Filters (no card wrapper, but padded to align with cards below) */}
             <div className="col-12">
                 <div className="px-5 mb-4">
-                {/* Search bar row */}
-                <div className="flex align-items-center gap-2 mb-3">
-                    <span className="p-input-icon-left flex-1">
-                        <i className="pi pi-search" />
-                        <AutoComplete
-                            value={searchValue}
-                            suggestions={suggestions}
-                            completeMethod={search}
-                            field="name"
-                            itemTemplate={itemTemplate}
-                            onChange={(e) => {
-                                setSearchValue(e.value);
-                                if (e.value === null || e.value === '') {
-                                    if (selectedAppId) {
-                                        setSelectedAppId(null);
-                                        router.push('/');
+                    {/* Search bar row */}
+                    <div className="flex align-items-center gap-2 mb-3">
+                        <span className="p-input-icon-left flex-1">
+                            <i className="pi pi-search" />
+                            <AutoComplete
+                                value={searchValue}
+                                suggestions={suggestions}
+                                completeMethod={search}
+                                field="name"
+                                itemTemplate={itemTemplate}
+                                onChange={(e) => {
+                                    setSearchValue(e.value);
+                                    if (e.value === null || e.value === '') {
+                                        if (selectedAppId) {
+                                            setSelectedAppId(null);
+                                            router.push('/');
+                                        }
                                     }
-                                }
-                            }}
-                            onSelect={onSelectApp}
-                            placeholder="Search apps by name, owner… (leave empty for all apps)"
-                            dropdown
-                            forceSelection
-                            className="w-full"
-                            inputClassName="w-full pl-5"
-                        />
-                    </span>
-                    {selectedAppId && <Button label="View all apps" icon="pi pi-times" outlined onClick={clearSelection} />}
-                </div>
+                                }}
+                                onSelect={onSelectApp}
+                                placeholder="Search apps by name, owner… (leave empty for all apps)"
+                                dropdown
+                                forceSelection
+                                className="w-full"
+                                inputClassName="w-full pl-5"
+                            />
+                        </span>
+                        {selectedAppId && <Button label="View all apps" icon="pi pi-times" outlined onClick={clearSelection} />}
+                    </div>
 
-                {/* Title + filters */}
-                <div className="flex flex-column md:flex-row md:align-items-end gap-3 flex-wrap">
-                    <div className="flex-1">
-                        <div className="flex align-items-center gap-2 flex-wrap">
-                            <h3 className="m-0">{title}</h3>
-                            {selectedAppId && appDetail && (appDetail.active ? <Tag severity="success" value="Active" /> : <Tag severity="danger" value="Disabled" />)}
+                    {/* Title + filters */}
+                    <div className="flex flex-column md:flex-row md:align-items-end gap-3 flex-wrap">
+                        <div className="flex-1">
+                            <div className="flex align-items-center gap-2 flex-wrap">
+                                <h3 className="m-0">{title}</h3>
+                                {selectedAppId && appDetail && (appDetail.active ? <Tag severity="success" value="Active" /> : <Tag severity="danger" value="Disabled" />)}
+                            </div>
                         </div>
-                    </div>
-                    <div className="field m-0">
-                        <label className="block text-500 text-sm mb-1">Date range</label>
-                        <Calendar
-                            value={range as any}
-                            onChange={(e) => setRange(e.value as any)}
-                            selectionMode="range"
-                            readOnlyInput
-                            dateFormat="yy-mm-dd"
-                            showIcon
-                            placeholder="Pick a range"
-                        />
-                    </div>
-                    {!selectedAppId && (
                         <div className="field m-0">
-                            <label className="block text-500 text-sm mb-1">Department</label>
-                            <Dropdown value={departmentFilter} options={departmentOptions} onChange={(e) => setDepartmentFilter(e.value)} placeholder="All departments" showClear />
+                            <label className="block text-500 text-sm mb-1">Date range</label>
+                            <Calendar
+                                value={range as any}
+                                onChange={(e) => setRange(e.value as any)}
+                                selectionMode="range"
+                                readOnlyInput
+                                dateFormat="yy-mm-dd"
+                                showIcon
+                                placeholder="Pick a range"
+                            />
                         </div>
-                    )}
-                    <Button icon="pi pi-refresh" onClick={refresh} loading={loading} tooltip="Refresh" />
-                    {selectedAppId && appDetail && (
-                        <Button icon="pi pi-key" label="Show App ID & API Key" onClick={openCredentials} severity="info" outlined />
-                    )}
-                </div>
+                        {!selectedAppId && (
+                            <div className="field m-0">
+                                <label className="block text-500 text-sm mb-1">Department</label>
+                                <Dropdown value={departmentFilter} options={departmentOptions} onChange={(e) => setDepartmentFilter(e.value)} placeholder="All departments" showClear />
+                            </div>
+                        )}
+                        <Button icon="pi pi-refresh" onClick={refresh} loading={loading} tooltip="Refresh" />
+                        {selectedAppId && appDetail && (
+                            <Button icon="pi pi-key" label="Show App ID & API Key" onClick={openCredentials} severity="info" outlined />
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -424,7 +450,18 @@ const DashboardPage = () => {
 
                     <div className="col-12 xl:col-8">
                         <div className="card h-full flex flex-column">
-                            <h5>Events over time</h5>
+                            <div className="flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <h5 className="m-0">Events over time</h5>
+                                <SelectButton
+                                    value={globalSeriesCategory}
+                                    options={SERIES_OPTIONS}
+                                    itemTemplate={seriesItemTemplate}
+                                    onChange={(e) => {
+                                        if (e.value) setGlobalSeriesCategory(e.value as SeriesCategory);
+                                    }}
+                                    allowEmpty={false}
+                                />
+                            </div>
                             <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
                                 <Chart type="line" data={globalLine.data} options={globalLine.options} style={{ height: '100%', width: '100%' }} />
                             </div>
@@ -497,7 +534,18 @@ const DashboardPage = () => {
 
                     <div className="col-12 xl:col-8">
                         <div className="card h-full flex flex-column">
-                            <h5>Events over time</h5>
+                            <div className="flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <h5 className="m-0">Events over time</h5>
+                                <SelectButton
+                                    value={appSeriesCategory}
+                                    options={SERIES_OPTIONS}
+                                    itemTemplate={seriesItemTemplate}
+                                    onChange={(e) => {
+                                        if (e.value) setAppSeriesCategory(e.value as SeriesCategory);
+                                    }}
+                                    allowEmpty={false}
+                                />
+                            </div>
                             <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
                                 <Chart type="line" data={appLine.data} options={appLine.options} style={{ height: '100%', width: '100%' }} />
                             </div>
@@ -647,7 +695,7 @@ const UsageExamples = ({ apiKey }: { apiKey?: string }) => {
 
                     <h6 className="mb-2">App opened</h6>
                     <pre className="surface-100 p-3 border-round overflow-auto" style={{ fontSize: '0.8rem' }}>
-{`curl -X POST https://<your-host>/api/track/app-opened \\
+                        {`curl -X POST https://<your-host>/api/track/app-opened \\
   -H "x-api-key: ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{"email":"jane@company.com","department":"Finance"}'`}
@@ -655,7 +703,7 @@ const UsageExamples = ({ apiKey }: { apiKey?: string }) => {
 
                     <h6 className="mb-2 mt-3">Feature triggered</h6>
                     <pre className="surface-100 p-3 border-round overflow-auto" style={{ fontSize: '0.8rem' }}>
-{`curl -X POST https://<your-host>/api/track/feature \\
+                        {`curl -X POST https://<your-host>/api/track/feature \\
   -H "x-api-key: ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{"email":"jane@company.com","featureName":"export_csv","department":"Finance"}'`}
@@ -663,7 +711,7 @@ const UsageExamples = ({ apiKey }: { apiKey?: string }) => {
 
                     <h6 className="mb-2 mt-3">Tag</h6>
                     <pre className="surface-100 p-3 border-round overflow-auto" style={{ fontSize: '0.8rem' }}>
-{`curl -X POST https://<your-host>/api/track/tag \\
+                        {`curl -X POST https://<your-host>/api/track/tag \\
   -H "x-api-key: ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{"email":"jane@company.com","tag":"beta-tester","department":"Finance"}'`}
@@ -690,7 +738,7 @@ const KpiCard = ({ label, value, icon, bg, color }: { label: string; value: numb
     </div>
 );
 
-function buildLineChart(rows: Array<{ day: string; category: string; count: number }> | undefined) {
+function buildLineChart(rows: Array<{ day: string; category: string; count: number }> | undefined, category: SeriesCategory) {
     if (!rows || rows.length === 0) {
         return {
             data: { labels: [], datasets: [] as any[] },
@@ -705,19 +753,25 @@ function buildLineChart(rows: Array<{ day: string; category: string; count: numb
         (entry as any)[row.category] = row.count;
     }
     const days = Array.from(dayMap.keys()).sort();
+    const color = CATEGORY_COLORS[category];
     return {
         data: {
             labels: days,
             datasets: [
-                { label: 'App opens', data: days.map((d) => dayMap.get(d)!.app_open), borderColor: CATEGORY_COLORS.app_open, backgroundColor: CATEGORY_COLORS.app_open, tension: 0.3, fill: false },
-                { label: 'Feature triggers', data: days.map((d) => dayMap.get(d)!.feature), borderColor: CATEGORY_COLORS.feature, backgroundColor: CATEGORY_COLORS.feature, tension: 0.3, fill: false },
-                { label: 'Tags', data: days.map((d) => dayMap.get(d)!.tag), borderColor: CATEGORY_COLORS.tag, backgroundColor: CATEGORY_COLORS.tag, tension: 0.3, fill: false }
+                {
+                    label: SERIES_LABEL[category],
+                    data: days.map((d) => dayMap.get(d)![category]),
+                    borderColor: color,
+                    backgroundColor: color,
+                    tension: 0.3,
+                    fill: false
+                }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'top' as const } },
+            plugins: { legend: { display: false } },
             scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
         }
     };
