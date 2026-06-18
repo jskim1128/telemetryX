@@ -1,6 +1,8 @@
 @media screen and (min-width: 1960px) {
-    .layout-main, .landing-wrapper {
-        width: 1504px;
+
+    .layout-main,
+    .landing-wrapper {
+        width: 100%;
         margin-left: auto !important;
         margin-right: auto !important;
     }
@@ -11,7 +13,7 @@
         &.layout-overlay {
             .layout-main-container {
                 margin-left: 0;
-                padding-left: 2rem;
+                padding-left: 1rem;
             }
 
             .layout-sidebar {
@@ -26,6 +28,10 @@
             &.layout-overlay-active {
                 .layout-sidebar {
                     transform: translateX(0);
+                }
+
+                .layout-mask {
+                    display: block;
                 }
             }
         }
@@ -50,6 +56,14 @@
 
         .layout-mask {
             display: none;
+            animation: fadein $transitionDuration;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 998;
+            width: 100%;
+            height: 100%;
+            background-color: var(--maskbg);
         }
     }
 }

@@ -1,11 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '@/lib/prisma';
 import { authenticateApp } from '@/lib/auth';
+import { applyTrackCors } from '@/lib/cors';
 import { isValidEmail, asOptionalString } from '@/lib/validation';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    if (applyTrackCors(req, res)) return;
+
     if (req.method !== 'POST') {
-        res.setHeader('Allow', 'POST');
+        res.setHeader('Allow', 'POST, OPTIONS');
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
