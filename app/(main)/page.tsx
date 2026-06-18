@@ -84,6 +84,31 @@ function defaultRange(): [Date, Date] {
     return [from, to];
 }
 
+/**
+ * Normalize a selected range so server queries are inclusive AND always
+ * extend up to "now" when the range's end is today or later. This ensures
+ * events recorded after the page was loaded are included on refresh.
+ */
+function effectiveRange(range: [Date | null, Date | null]): { from: Date; to: Date } | null {
+    const [rawFrom, rawTo] = range;
+    if (!rawFrom || !rawTo) return null;
+
+    // Start of the "from" day.
+    const from = new Date(rawFrom);
+    from.setHours(0, 0, 0, 0);
+
+    // End of the "to" day.
+    const toEnd = new Date(rawTo);
+    toEnd.setHours(23, 59, 59, 999);
+
+    // Always ensure the upper bound is at least "now" so events created
+    // after page load are still included when the user clicks refresh.
+    const now = new Date();
+    const to = new Date(Math.max(toEnd.getTime(), now.getTime()));
+
+    return { from, to };
+}
+
 const DashboardPage = () => {
     const toast = useRef<Toast>(null);
     const router = useRouter();
@@ -118,7 +143,7 @@ const DashboardPage = () => {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch('/api/apps');
+                const res = await fetch('/api/apps', { cache: 'no-store' });
                 const data = await res.json();
                 if (res.ok) {
                     const list: AppOption[] = data.apps.map((a: any) => ({
@@ -160,15 +185,19 @@ const DashboardPage = () => {
     }, [appIdFromUrl]);
 
     const loadGlobal = async () => {
-        if (!range[0] || !range[1]) return;
+        const eff = effectiveRange(range);
+        if (!eff) return;
         setLoading(true);
         try {
             const qs = new URLSearchParams();
-            qs.set('from', range[0].toISOString());
-            qs.set('to', range[1].toISOString());
+            qs.set('from', eff.from.toISOString());
+            qs.set('to', eff.to.toISOString());
             if (departmentFilter) qs.set('department', departmentFilter);
 
-            const [oRes, sRes] = await Promise.all([fetch(`/api/stats/overview?${qs.toString()}`), fetch(`/api/stats/timeseries?${qs.toString()}`)]);
+            const [oRes, sRes] = await Promise.all([
+                fetch(`/api/stats/overview?${qs.toString()}`, { cache: 'no-store' }),
+                fetch(`/api/stats/timeseries?${qs.toString()}`, { cache: 'no-store' })
+            ]);
             const oData = await oRes.json();
             const sData = await sRes.json();
             if (!oRes.ok) throw new Error(oData?.error || 'Failed to load overview');
@@ -183,14 +212,18 @@ const DashboardPage = () => {
     };
 
     const loadApp = async (id: string) => {
-        if (!range[0] || !range[1]) return;
+        const eff = effectiveRange(range);
+        if (!eff) return;
         setLoading(true);
         try {
             const qs = new URLSearchParams();
-            qs.set('from', range[0].toISOString());
-            qs.set('to', range[1].toISOString());
+            qs.set('from', eff.from.toISOString());
+            qs.set('to', eff.to.toISOString());
 
-            const [appRes, statsRes] = await Promise.all([fetch(`/api/apps/${id}`), fetch(`/api/stats/app/${id}?${qs.toString()}`)]);
+            const [appRes, statsRes] = await Promise.all([
+                fetch(`/api/apps/${id}`, { cache: 'no-store' }),
+                fetch(`/api/stats/app/${id}?${qs.toString()}`, { cache: 'no-store' })
+            ]);
             const appData = await appRes.json();
             const statsData = await statsRes.json();
             if (!appRes.ok) throw new Error(appData?.error || 'Failed to load app');
