@@ -173,21 +173,49 @@ export async function getTopFeatures(opts: { range: DateRange; appId?: string; l
         .slice(0, limit);
 }
 
-/** Top users (by email) for an app or globally. */
+/** Top users (by email) for an app or globally.
+ *
+ * For each user, also computes the single most-triggered event (feature name
+ * or tag value) along with how many times it occurred. App-open events are
+ * excluded from "top event" since they are not user-driven actions worth
+ * highlighting — but they still count toward the user's total events.
+ */
 export async function getTopUsers(opts: { range: DateRange; appId?: string; limit?: number }) {
     const { range, appId, limit = 10 } = opts;
     const where: any = { createdAt: { gte: range.from, lte: range.to } };
     if (appId) where.appId = appId;
 
-    const [a, b, c] = await Promise.all([
+    const [a, b, c, featureByUser, tagByUser] = await Promise.all([
         prisma.appOpenEvent.groupBy({ by: ['email'], _count: { _all: true }, where }),
         prisma.featureEvent.groupBy({ by: ['email'], _count: { _all: true }, where }),
-        prisma.tagEvent.groupBy({ by: ['email'], _count: { _all: true }, where })
+        prisma.tagEvent.groupBy({ by: ['email'], _count: { _all: true }, where }),
+        prisma.featureEvent.groupBy({ by: ['email', 'featureName'], _count: { _all: true }, where }),
+        prisma.tagEvent.groupBy({ by: ['email', 'tag'], _count: { _all: true }, where })
     ]);
     const totals = new Map<string, number>();
     for (const arr of [a, b, c]) for (const r of arr) totals.set(r.email, (totals.get(r.email) || 0) + r._count._all);
+
+    // Build per-user top event (feature or tag) with the highest count.
+    type TopEvent = { label: string; type: 'feature' | 'tag'; count: number };
+    const topEventByEmail = new Map<string, TopEvent>();
+    const consider = (email: string, candidate: TopEvent) => {
+        const cur = topEventByEmail.get(email);
+        if (!cur || candidate.count > cur.count) topEventByEmail.set(email, candidate);
+    };
+    for (const r of featureByUser) consider(r.email, { label: r.featureName, type: 'feature', count: r._count._all });
+    for (const r of tagByUser) consider(r.email, { label: r.tag, type: 'tag', count: r._count._all });
+
     return Array.from(totals.entries())
-        .map(([email, count]) => ({ email, count }))
+        .map(([email, count]) => {
+            const top = topEventByEmail.get(email) || null;
+            return {
+                email,
+                count,
+                topEvent: top ? top.label : null,
+                topEventType: top ? top.type : null,
+                topEventCount: top ? top.count : 0
+            };
+        })
         .sort((x, y) => y.count - x.count)
         .slice(0, limit);
 }

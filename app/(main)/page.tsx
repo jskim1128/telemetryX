@@ -58,7 +58,7 @@ interface AppStatsResp {
     series: Array<{ day: string; category: string; count: number }>;
     departments: Array<{ department: string; count: number }>;
     features: Array<{ featureName: string; count: number }>;
-    users: Array<{ email: string; count: number }>;
+    users: Array<{ email: string; count: number; topEvent: string | null; topEventType: 'feature' | 'tag' | null; topEventCount: number }>;
     tags: Array<{ tag: string; count: number }>;
     recent: Array<any>;
 }
@@ -584,7 +584,22 @@ const DashboardPage = () => {
                             <div className="flex-1">
                                 <DataTable value={appStats.users} emptyMessage="No user activity yet." responsiveLayout="scroll">
                                     <Column field="email" header="Email" />
-                                    <Column field="count" header="Events" sortable />
+                                    <Column
+                                        field="topEvent"
+                                        header="Top event"
+                                        body={(r: any) =>
+                                            r.topEvent ? (
+                                                <span className="flex align-items-center gap-2">
+                                                    <Tag severity={r.topEventType === 'feature' ? 'success' : 'warning'} value={r.topEventType === 'feature' ? 'Feature' : 'Tag'} />
+                                                    <span>{r.topEvent}</span>
+                                                    <small className="text-500">({r.topEventCount})</small>
+                                                </span>
+                                            ) : (
+                                                <span className="text-500">—</span>
+                                            )
+                                        }
+                                    />
+                                    <Column field="count" header="Total events" sortable />
                                 </DataTable>
                             </div>
                         </div>
