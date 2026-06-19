@@ -9,6 +9,7 @@ import { Password } from 'primereact/password';
 import { Toast } from 'primereact/toast';
 import { classNames } from 'primereact/utils';
 import { LayoutContext } from '../../../../layout/context/layoutcontext';
+import Logo from '@/public/assets/telemetryX_1.png'
 
 const LoginForm = () => {
     const router = useRouter();
@@ -72,11 +73,7 @@ const LoginForm = () => {
         <div className={containerClassName}>
             <Toast ref={toast} />
             <div className="flex flex-column align-items-center justify-content-center">
-                <img
-                    src={`/layout/images/logo-${layoutConfig.colorScheme === 'light' ? 'dark' : 'white'}.svg`}
-                    alt="Feature Tracking"
-                    className="mb-5 w-6rem flex-shrink-0"
-                />
+                <img src={Logo.src} alt="logo" className="mb-5 h-6rem flex-shrink-0" />
                 <div
                     style={{
                         borderRadius: '56px',

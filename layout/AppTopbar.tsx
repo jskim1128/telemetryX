@@ -8,6 +8,7 @@ import React, { forwardRef, useContext, useImperativeHandle, useMemo, useRef } f
 import { AppTopbarRef } from '@/types';
 import { LayoutContext } from './context/layoutcontext';
 import { useAuth } from './context/authcontext';
+import Logo from '@/public/assets/telemetryX_1.png'
 
 const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
     const { layoutConfig, layoutState, onMenuToggle, showProfileSidebar } = useContext(LayoutContext);
@@ -69,8 +70,8 @@ const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
             </button>
 
             <Link href="/" className="layout-topbar-logo">
-                <img src={`/layout/images/logo-${layoutConfig.colorScheme !== 'light' ? 'white' : 'dark'}.svg`} width="47.22px" height={'35px'} alt="logo" />
-                <span>FEAT TRACKING</span>
+                <img src={Logo.src} height={'35px'} alt="logo" />
+                <span>Telemetry X</span>
             </Link>
 
             <button ref={topbarmenubuttonRef} type="button" className="p-link layout-topbar-menu-button layout-topbar-button" onClick={showProfileSidebar}>
