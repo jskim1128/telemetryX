@@ -307,7 +307,7 @@ const DashboardPage = () => {
         try {
             await navigator.clipboard.writeText(text);
             toast.current?.show({ severity: 'success', summary: 'Copied', detail: `${label} copied to clipboard` });
-        } catch {
+        } catch (error) {
             toast.current?.show({ severity: 'warn', summary: 'Copy failed', detail: 'Select and copy manually' });
         }
     };

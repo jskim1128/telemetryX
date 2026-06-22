@@ -9,7 +9,7 @@ import { Password } from 'primereact/password';
 import { Toast } from 'primereact/toast';
 import { classNames } from 'primereact/utils';
 import { LayoutContext } from '../../../../layout/context/layoutcontext';
-import Logo from '@/public/assets/telemetryX_1.png'
+import Logo from '@/public/assets/telemetryX.png'
 
 const LoginForm = () => {
     const router = useRouter();

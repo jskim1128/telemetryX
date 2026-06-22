@@ -10,7 +10,7 @@ const defaultLayoutConfig: LayoutConfig = {
     inputStyle: 'outlined',
     menuMode: 'static',
     colorScheme: 'light',
-    theme: 'lara-light-indigo',
+    theme: 'lara-light-teal',
     scale: 14
 };
 

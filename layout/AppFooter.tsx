@@ -3,7 +3,7 @@
 import React, { useContext } from 'react';
 import { LayoutContext } from './context/layoutcontext';
 import packageInfo from '../package.json';
-import Logo from '@/public/assets/telemetryX_1.png'
+import Logo from '@/public/assets/telemetryX.png'
 
 const AppFooter = () => {
     const { layoutConfig } = useContext(LayoutContext);

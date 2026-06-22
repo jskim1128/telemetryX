@@ -8,7 +8,7 @@ import React, { forwardRef, useContext, useImperativeHandle, useMemo, useRef } f
 import { AppTopbarRef } from '@/types';
 import { LayoutContext } from './context/layoutcontext';
 import { useAuth } from './context/authcontext';
-import Logo from '@/public/assets/telemetryX_1.png'
+import Logo from '@/public/assets/telemetryX.png'
 
 const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
     const { layoutConfig, layoutState, onMenuToggle, showProfileSidebar } = useContext(LayoutContext);
