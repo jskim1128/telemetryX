@@ -173,6 +173,94 @@ export async function getTopFeatures(opts: { range: DateRange; appId?: string; l
         .slice(0, limit);
 }
 
+/** Daily time series per top feature for an app (or globally).
+ *
+ * Returns one bucket per (day, featureName) for the top-N feature names
+ * within the range. Useful for plotting a multi-line trend of the most
+ * used features over time. Days without activity for a given feature are
+ * omitted; the client is expected to fill missing days with 0.
+ */
+export async function getTopFeatureTimeSeries(opts: { range: DateRange; appId?: string; limit?: number }) {
+    const { range, appId, limit = 5 } = opts;
+    const where: any = { createdAt: { gte: range.from, lte: range.to } };
+    if (appId) where.appId = appId;
+
+    // 1) Identify the top-N feature names in the window.
+    const top = await prisma.featureEvent.groupBy({
+        by: ['featureName'],
+        where,
+        _count: { _all: true }
+    });
+    const topNames = top
+        .map((r) => ({ featureName: r.featureName, count: r._count._all }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit)
+        .map((r) => r.featureName);
+
+    if (topNames.length === 0) return [] as Array<{ day: string; featureName: string; count: number }>;
+
+    // 2) Fetch raw events for those features and bucket by day in JS to stay
+    // portable across SQLite (dev) and PostgreSQL (prod).
+    const rows = await prisma.featureEvent.findMany({
+        where: { ...where, featureName: { in: topNames } },
+        select: { createdAt: true, featureName: true }
+    });
+
+    const buckets = new Map<string, { day: string; featureName: string; count: number }>();
+    for (const r of rows) {
+        const day = r.createdAt.toISOString().slice(0, 10);
+        const key = `${day}|${r.featureName}`;
+        const cur = buckets.get(key);
+        if (cur) cur.count += 1;
+        else buckets.set(key, { day, featureName: r.featureName, count: 1 });
+    }
+    return Array.from(buckets.values()).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+}
+
+/** Daily time series per top tag for an app (or globally).
+ *
+ * Mirrors {@link getTopFeatureTimeSeries} but for tag events. Returns one
+ * bucket per (day, tag) for the top-N tag values within the range. Days
+ * without activity for a given tag are omitted; the client is expected to
+ * fill missing days with 0.
+ */
+export async function getTopTagTimeSeries(opts: { range: DateRange; appId?: string; limit?: number }) {
+    const { range, appId, limit = 5 } = opts;
+    const where: any = { createdAt: { gte: range.from, lte: range.to } };
+    if (appId) where.appId = appId;
+
+    // 1) Identify the top-N tags in the window.
+    const top = await prisma.tagEvent.groupBy({
+        by: ['tag'],
+        where,
+        _count: { _all: true }
+    });
+    const topNames = top
+        .map((r) => ({ tag: r.tag, count: r._count._all }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit)
+        .map((r) => r.tag);
+
+    if (topNames.length === 0) return [] as Array<{ day: string; tag: string; count: number }>;
+
+    // 2) Fetch raw events for those tags and bucket by day in JS to stay
+    // portable across SQLite (dev) and PostgreSQL (prod).
+    const rows = await prisma.tagEvent.findMany({
+        where: { ...where, tag: { in: topNames } },
+        select: { createdAt: true, tag: true }
+    });
+
+    const buckets = new Map<string, { day: string; tag: string; count: number }>();
+    for (const r of rows) {
+        const day = r.createdAt.toISOString().slice(0, 10);
+        const key = `${day}|${r.tag}`;
+        const cur = buckets.get(key);
+        if (cur) cur.count += 1;
+        else buckets.set(key, { day, tag: r.tag, count: 1 });
+    }
+    return Array.from(buckets.values()).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+}
+
 /** Top users (by email) for an app or globally.
  *
  * For each user, also computes the single most-triggered event (feature name

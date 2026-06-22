@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '@/lib/prisma';
-import { getDepartmentBreakdown, getOverview, getTimeSeries, getTopFeatures, getTopTags, getTopUsers, parseDateRange } from '@/lib/stats';
+import { getDepartmentBreakdown, getOverview, getTimeSeries, getTopFeatures, getTopFeatureTimeSeries, getTopTags, getTopTagTimeSeries, getTopUsers, parseDateRange } from '@/lib/stats';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'GET') {
@@ -16,13 +16,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const app = await prisma.app.findUnique({ where: { id }, select: { id: true, name: true } });
         if (!app) return res.status(404).json({ error: 'App not found' });
 
-        const [overview, series, departments, features, users, tags, recent] = await Promise.all([
+        const [overview, series, departments, features, featureSeries, users, tags, tagSeries, recent] = await Promise.all([
             getOverview({ range, appId: id }),
             getTimeSeries({ range, appId: id }),
             getDepartmentBreakdown({ range, appId: id }),
             getTopFeatures({ range, appId: id, limit: 10 }),
+            getTopFeatureTimeSeries({ range, appId: id, limit: 5 }),
             getTopUsers({ range, appId: id, limit: 10 }),
             getTopTags({ range, appId: id, limit: 10 }),
+            getTopTagTimeSeries({ range, appId: id, limit: 5 }),
             getRecentEvents(id, 20)
         ]);
 
@@ -33,8 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             series,
             departments,
             features,
+            featureSeries,
             users,
             tags,
+            tagSeries,
             recent
         });
     } catch (err) {

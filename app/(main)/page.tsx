@@ -42,8 +42,10 @@ interface AppStatsResp {
     series: Array<{ day: string; category: string; count: number }>;
     departments: Array<{ department: string; count: number }>;
     features: Array<{ featureName: string; count: number }>;
+    featureSeries: Array<{ day: string; featureName: string; count: number }>;
     users: Array<{ email: string; count: number; topEvent: string | null; topEventType: 'feature' | 'tag' | null; topEventCount: number }>;
     tags: Array<{ tag: string; count: number }>;
+    tagSeries: Array<{ day: string; tag: string; count: number }>;
     recent: Array<any>;
 }
 
@@ -340,7 +342,16 @@ const DashboardPage = () => {
     // Build charts
     const appLine = useMemo(() => buildLineChart(appStats?.series, appSeriesCategory), [appStats, appSeriesCategory]);
     const appDepartmentChart = useMemo(() => buildDoughnut(appStats?.departments || []), [appStats]);
-    const appFeatureChart = useMemo(() => buildBar((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [appStats]);
+    const appFeatureChart = useMemo(() => buildPie((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [appStats]);
+    const appFeatureTrendChart = useMemo(
+        () => buildTrendChart((appStats?.featureSeries || []).map((r) => ({ day: r.day, label: r.featureName, count: r.count }))),
+        [appStats]
+    );
+    const appTagChart = useMemo(() => buildPie((appStats?.tags || []).map((t) => ({ label: t.tag, count: t.count })), PALETTE), [appStats]);
+    const appTagTrendChart = useMemo(
+        () => buildTrendChart((appStats?.tagSeries || []).map((r) => ({ day: r.day, label: r.tag, count: r.count }))),
+        [appStats]
+    );
 
     const itemTemplate = (item: AppOption) => (
         <div className="flex flex-column">
@@ -487,11 +498,50 @@ const DashboardPage = () => {
                     <div className="col-12 lg:col-6">
                         <div className="card h-full flex flex-column">
                             <h5>Top features triggered</h5>
-                            <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
+                            <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
                                 {appStats.features.length === 0 ? (
-                                    <p className="text-500">No feature triggers yet.</p>
+                                    <p className="text-500 m-0">No feature triggers yet.</p>
                                 ) : (
-                                    <Chart type="bar" data={appFeatureChart} options={{ maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }} style={{ height: '100%', width: '100%' }} />
+                                    <Chart type="pie" data={appFeatureChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} style={{ height: '100%', width: '100%', maxHeight: '320px' }} />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12 lg:col-6">
+                        <div className="card h-full flex flex-column">
+                            <h5>Top features trend</h5>
+                            <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
+                                {appFeatureTrendChart.data.datasets.length === 0 ? (
+                                    <p className="text-500 m-0">No feature triggers yet.</p>
+                                ) : (
+                                    <Chart type="line" data={appFeatureTrendChart.data} options={appFeatureTrendChart.options} style={{ height: '100%', width: '100%' }} />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12 lg:col-6">
+                        <div className="card h-full flex flex-column">
+                            <h5>Top tags</h5>
+                            <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
+                                {appStats.tags.length === 0 ? (
+                                    <p className="text-500 m-0">No tag events yet.</p>
+                                ) : (
+                                    <Chart type="pie" data={appTagChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} style={{ height: '100%', width: '100%', maxHeight: '320px' }} />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12 lg:col-6">
+                        <div className="card h-full flex flex-column">
+                            <h5>Top tags trend</h5>
+                            <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
+                                {appTagTrendChart.data.datasets.length === 0 ? (
+                                    <p className="text-500 m-0">No tag events yet.</p>
+                                ) : (
+                                    <Chart type="line" data={appTagTrendChart.data} options={appTagTrendChart.options} style={{ height: '100%', width: '100%' }} />
                                 )}
                             </div>
                         </div>
@@ -916,11 +966,69 @@ function buildDoughnut(rows: Array<{ department: string; count: number }>) {
     };
 }
 
-function buildBar(rows: Array<{ label: string; count: number }>, color: string | string[]) {
-    const backgroundColor = Array.isArray(color) ? rows.map((_, i) => color[i % color.length]) : color;
+function buildPie(rows: Array<{ label: string; count: number }>, palette: string[]) {
     return {
         labels: rows.map((r) => r.label),
-        datasets: [{ label: 'Count', data: rows.map((r) => r.count), backgroundColor }]
+        datasets: [
+            {
+                data: rows.map((r) => r.count),
+                backgroundColor: rows.map((_, i) => palette[i % palette.length])
+            }
+        ]
+    };
+}
+
+/** Multi-line trend chart from a list of (day, label, count) rows.
+ *
+ * Fills missing days with 0 so each line is continuous across the full
+ * range of days observed in the input. Datasets are ordered by total
+ * count (descending) so the legend reads like a leaderboard. Used for
+ * both the top-features and top-tags trend charts.
+ */
+function buildTrendChart(rows: Array<{ day: string; label: string; count: number }> | undefined) {
+    if (!rows || rows.length === 0) {
+        return {
+            data: { labels: [] as string[], datasets: [] as any[] },
+            options: { responsive: true, maintainAspectRatio: false }
+        };
+    }
+
+    // Collect the set of days and labels present.
+    const daySet = new Set<string>();
+    const totals = new Map<string, number>();
+    for (const r of rows) {
+        daySet.add(r.day);
+        totals.set(r.label, (totals.get(r.label) || 0) + r.count);
+    }
+    const days = Array.from(daySet).sort();
+    const labels = Array.from(totals.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name]) => name);
+
+    // Index rows for O(1) lookup when filling the grid.
+    const lookup = new Map<string, number>();
+    for (const r of rows) lookup.set(`${r.day}|${r.label}`, r.count);
+
+    const datasets = labels.map((label, i) => {
+        const color = PALETTE[i % PALETTE.length];
+        return {
+            label,
+            data: days.map((d) => lookup.get(`${d}|${label}`) || 0),
+            borderColor: color,
+            backgroundColor: color,
+            tension: 0.3,
+            fill: false
+        };
+    });
+
+    return {
+        data: { labels: days, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
     };
 }
 
