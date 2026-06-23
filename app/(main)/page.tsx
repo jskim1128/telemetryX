@@ -18,6 +18,7 @@ import { SelectButton } from 'primereact/selectbutton';
 import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import AiSummaryCard from './_components/AiSummaryCard';
 
 interface AppOption {
     id: string;
@@ -457,6 +458,8 @@ const DashboardPage = () => {
             {/* === APP-SPECIFIC VIEW === */}
             {appStats && (
                 <>
+                    <AiSummaryCard appId={appStats.app.id} range={effectiveRange(range)} />
+
                     <KpiCard label="App opens" value={appStats.overview.appOpens} icon="pi-sign-in" bg="bg-blue-100" color="text-blue-500" />
                     <KpiCard label="Feature triggers" value={appStats.overview.featureTriggers} icon="pi-bolt" bg="bg-green-100" color="text-green-500" />
                     <KpiCard label="Tag instances" value={appStats.overview.tagInstances} icon="pi-tag" bg="bg-orange-100" color="text-orange-500" />

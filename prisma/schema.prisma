@@ -35,6 +35,8 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  aiConversations AiChatConversation[]
+
   @@index([email])
 }
 
@@ -51,9 +53,11 @@ model App {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  appOpens AppOpenEvent[]
-  features FeatureEvent[]
-  tags     TagEvent[]
+  appOpens        AppOpenEvent[]
+  features        FeatureEvent[]
+  tags            TagEvent[]
+  aiSummaries     AppAiSummary[]
+  aiConversations AiChatConversation[]
 
   @@index([name])
   @@index([active])
@@ -108,4 +112,67 @@ model TagEvent {
   @@index([appId, email])
   @@index([department])
   @@index([createdAt])
+}
+
+// ============================================================================
+// AI features
+// ============================================================================
+
+// Cached AI-generated dashboard summary for an App over a (from, to) window.
+// The (appId, inputHash) unique constraint lets us reuse a previous summary
+// when the underlying stats payload has not changed. A TTL is enforced in
+// the API handler — beyond TTL the row is regenerated even if the hash is
+// identical (in case the model itself or the prompt changed).
+model AppAiSummary {
+  id        String   @id @default(cuid())
+  appId     String
+  rangeFrom DateTime
+  rangeTo   DateTime
+  inputHash String
+  summary   String
+  model     String
+  tokensIn  Int?
+  tokensOut Int?
+  createdAt DateTime @default(now())
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, inputHash])
+  @@index([appId, createdAt])
+}
+
+// A chatbot conversation. Optional appId scopes the conversation to a single
+// app — when null, the chatbot answers cross-app questions for the user.
+model AiChatConversation {
+  id        String   @id @default(cuid())
+  userId    Int
+  appId     String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AiChatMessage[]
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  app      App?            @relation(fields: [appId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([appId])
+}
+
+// A single message in a conversation. `role` is one of:
+//   'user', 'assistant', 'tool', 'system'
+// For tool messages, `toolName` records the function called and `toolCallId`
+// links back to the assistant message that requested the call.
+model AiChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  toolName       String?
+  toolCallId     String?
+  createdAt      DateTime @default(now())
+
+  conversation AiChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }

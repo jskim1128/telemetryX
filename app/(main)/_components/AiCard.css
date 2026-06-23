@@ -1,0 +1,79 @@
+/* Container styling */
+.ai-card {
+    position: relative;
+    background: var(--surface-ground);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    background: linear-gradient(90deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ff007f);
+    background-size: 400% 400%;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    /* Triggers the smooth infinite rainbow animation */
+    animation: rainbow-glow 8s ease infinite;
+    z-index: 0;
+}
+
+.ai-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--surface-ground);
+    height: 100%;
+    width: 100%;
+    z-index: -99;
+}
+
+/* Header & Badges */
+.ai-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ai-icon {
+    background: linear-gradient(90deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ff007f);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: float 3s ease-in-out infinite;
+}
+
+.ai-badge {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: linear-gradient(90deg, #a855f7, #6366f1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Subtle AI shimmer animation for the spark icon */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
+@keyframes rainbow-glow {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}

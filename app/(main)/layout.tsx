@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import Layout from '../../layout/layout';
+import AiChatLauncher from './_components/AiChatLauncher';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -20,6 +21,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return (
         <Suspense fallback={null}>
             <Layout>{children}</Layout>
+            <AiChatLauncher />
         </Suspense>
     );
 }
