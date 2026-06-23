@@ -594,7 +594,7 @@
   }
 
   .p-datepicker table td>span.p-highlight {
-    color: #0f766e;
+    color: var(--primary-color-text);
     background: #0f766e;
   }
 

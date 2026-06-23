@@ -13,6 +13,7 @@ import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
 import { Menu } from 'primereact/menu';
 import { Message } from 'primereact/message';
+import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { ScrollPanel } from 'primereact/scrollpanel';
 import { SelectButton } from 'primereact/selectbutton';
@@ -96,6 +97,64 @@ function defaultRange(): [Date, Date] {
     return [from, to];
 }
 
+type RangePresetKey = '7d' | '30d' | '90d' | 'ytd' | 'custom';
+
+interface RangePreset {
+    key: RangePresetKey;
+    label: string;
+    shortLabel: string;
+    tooltip: string;
+    /** Build the [from, to] range to apply when this preset is clicked. */
+    build: () => [Date, Date];
+}
+
+function rangeFromDays(days: number): [Date, Date] {
+    const to = new Date();
+    const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+    return [from, to];
+}
+
+function yearToDateRange(): [Date, Date] {
+    const to = new Date();
+    const from = new Date(to.getFullYear(), 0, 1); // Jan 1 of current year
+    return [from, to];
+}
+
+const RANGE_PRESETS: RangePreset[] = [
+    { key: '7d', label: 'Past week', shortLabel: '1W', tooltip: 'Last 7 days', build: () => rangeFromDays(7) },
+    { key: '30d', label: 'Past month', shortLabel: '1M', tooltip: 'Last 30 days', build: () => rangeFromDays(30) },
+    { key: '90d', label: 'Past quarter', shortLabel: '3M', tooltip: 'Last 90 days', build: () => rangeFromDays(90) },
+    { key: 'ytd', label: 'Past year', shortLabel: 'YTD', tooltip: 'Year to date (Jan 1 — today)', build: yearToDateRange }
+];
+
+/** Identify which preset matches the current range (within 1 day tolerance) so
+ * we can visually highlight the active quick-select button. */
+function detectPreset(range: [Date | null, Date | null]): RangePresetKey {
+    const [from, to] = range;
+    if (!from || !to) return 'custom';
+    const dayMs = 24 * 60 * 60 * 1000;
+    for (const preset of RANGE_PRESETS) {
+        const [pFrom, pTo] = preset.build();
+        if (Math.abs(to.getTime() - pTo.getTime()) <= dayMs && Math.abs(from.getTime() - pFrom.getTime()) <= dayMs) {
+            return preset.key;
+        }
+    }
+    return 'custom';
+}
+
+// Stable, locale-independent month names so SSR and CSR render the same
+// string. Using `toLocaleDateString(undefined, ...)` causes hydration
+// mismatches because the server's default locale rarely matches the
+// browser's (e.g. en-US vs en-GB ordering).
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatRangeSummary(range: [Date | null, Date | null]): string {
+    const [from, to] = range;
+    if (!from || !to) return '';
+    const fmt = (d: Date) => `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    return `${fmt(from)} → ${fmt(to)}`;
+}
+
 /**
  * Normalize a selected range so server queries are inclusive AND always
  * extend up to "now" when the range's end is today or later. This ensures
@@ -143,11 +202,13 @@ function clearCookie(name: string) {
 const DashboardPage = () => {
     const toast = useRef<Toast>(null);
     const moreMenu = useRef<Menu>(null);
+    const rangeOverlay = useRef<OverlayPanel>(null);
     const router = useRouter();
     const searchParams = useSearchParams();
     const appIdFromUrl = searchParams?.get('app') || null;
 
     const [range, setRange] = useState<[Date | null, Date | null]>(defaultRange());
+    const activePreset = useMemo(() => detectPreset(range), [range]);
 
     // App list & search
     const [appsList, setAppsList] = useState<AppOption[]>([]);
@@ -438,19 +499,103 @@ const DashboardPage = () => {
                                 {appDetail && (appDetail.active ? <Tag severity="success" value="Active" /> : <Tag severity="danger" value="Disabled" />)}
                             </div>
                         </div>
-                        <div className="field m-0">
-                            <label className="block text-500 text-sm mb-1">Date range</label>
-                            <Calendar
-                                value={range as any}
-                                onChange={(e) => setRange(e.value as any)}
-                                selectionMode="range"
-                                readOnlyInput
-                                dateFormat="yy-mm-dd"
-                                showIcon
-                                placeholder="Pick a range"
-                            />
+                        <div className='flex flex-row gap-3 align-items-center'>
+                            <div className="m-0">
+                                <button
+                                    type="button"
+                                    onClick={(e) => rangeOverlay.current?.toggle(e)}
+                                    className="date-range-trigger flex align-items-center gap-2 surface-card border-1 surface-border border-round px-3 py-2 cursor-pointer"
+                                    style={{ minWidth: '15rem', transition: 'border-color 120ms ease, box-shadow 120ms ease' }}
+                                    aria-label="Change date range"
+                                >
+                                    <i className="pi pi-calendar text-primary" />
+                                    <div className="flex flex-column align-items-start flex-1 line-height-2">
+                                        <span className="text-900 font-medium">
+                                            {activePreset === 'custom'
+                                                ? 'Custom range'
+                                                : RANGE_PRESETS.find((p) => p.key === activePreset)?.label}
+                                        </span>
+                                        <span className="text-500" style={{ fontSize: '0.7rem' }}>
+                                            {formatRangeSummary(range) || 'Pick a range'}
+                                        </span>
+                                    </div>
+                                    <i className="pi pi-chevron-down text-500" style={{ fontSize: '0.7rem' }} />
+                                </button>
+
+                                <OverlayPanel
+                                    ref={rangeOverlay}
+                                    showCloseIcon={false}
+                                    dismissable
+                                    className="date-range-overlay"
+                                >
+                                    <div className="flex" style={{ minWidth: '32rem' }}>
+                                        {/* Preset rail */}
+                                        <div
+                                            className="flex flex-column gap-1 pr-3 border-right-1 surface-border"
+                                            style={{ minWidth: '10rem' }}
+                                        >
+                                            <span className="text-500 text-xs font-semibold uppercase mb-1 px-2">
+                                                Quick select
+                                            </span>
+                                            {RANGE_PRESETS.map((preset) => {
+                                                const isActive = activePreset === preset.key;
+                                                return (
+                                                    <button
+                                                        key={preset.key}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setRange(preset.build());
+                                                            rangeOverlay.current?.hide();
+                                                        }}
+                                                        className={`date-range-preset flex align-items-center justify-content-between gap-2 px-2 py-2 border-round border-none cursor-pointer text-left text-sm ${isActive
+                                                            ? 'bg-primary-50 text-primary font-semibold'
+                                                            : 'surface-card text-700'
+                                                            }`}
+                                                    >
+                                                        <span>{preset.label}</span>
+                                                        {isActive && <i className="pi pi-check" style={{ fontSize: '0.75rem' }} />}
+                                                    </button>
+                                                );
+                                            })}
+                                            {activePreset === 'custom' && (
+                                                <div className="flex align-items-center gap-2 px-2 py-2 mt-1 border-round bg-primary-50 text-primary text-sm font-semibold">
+                                                    <i className="pi pi-pencil" style={{ fontSize: '0.75rem' }} />
+                                                    <span>Custom</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Inline calendar */}
+                                        <div className="pl-3 flex flex-column">
+                                            <span className="text-500 text-xs font-semibold uppercase mb-2">
+                                                Custom range
+                                            </span>
+                                            <Calendar
+                                                value={range as any}
+                                                onChange={(e) => setRange(e.value as any)}
+                                                selectionMode="range"
+                                                inline
+                                                numberOfMonths={1}
+                                                maxDate={new Date()}
+                                                readOnlyInput
+                                            />
+                                            <div className="flex justify-content-between align-items-center mt-2 pt-2 border-top-1 surface-border">
+                                                <small className="text-500">
+                                                    {range[0] && range[1] ? formatRangeSummary(range) : 'Select start and end dates'}
+                                                </small>
+                                                <Button
+                                                    label="Done"
+                                                    size="small"
+                                                    onClick={() => rangeOverlay.current?.hide()}
+                                                    disabled={!range[0] || !range[1]}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </OverlayPanel>
+                            </div>
+                            <Button icon="pi pi-refresh" onClick={refresh} loading={loading} severity="secondary" outlined tooltip="Refresh data" tooltipOptions={{ position: 'top' }} />
                         </div>
-                        <Button icon="pi pi-refresh" onClick={refresh} loading={loading} tooltip="Refresh" />
                         {appDetail && (
                             <>
                                 <Menu
