@@ -11,6 +11,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
+import { Menu } from 'primereact/menu';
 import { Message } from 'primereact/message';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { ScrollPanel } from 'primereact/scrollpanel';
@@ -141,6 +142,7 @@ function clearCookie(name: string) {
 
 const DashboardPage = () => {
     const toast = useRef<Toast>(null);
+    const moreMenu = useRef<Menu>(null);
     const router = useRouter();
     const searchParams = useSearchParams();
     const appIdFromUrl = searchParams?.get('app') || null;
@@ -406,7 +408,7 @@ const DashboardPage = () => {
                                 }}
                                 onSelect={onSelectApp}
                                 placeholder="Search apps by name, owner…"
-                                dropdown
+                                // dropdown
                                 forceSelection
                                 className="w-full"
                                 inputClassName="w-full pl-5"
@@ -415,7 +417,8 @@ const DashboardPage = () => {
                         <Button
                             label="Switch app"
                             icon="pi pi-th-large"
-                            outlined
+                            severity="secondary"
+                            text
                             onClick={() => {
                                 // Send the user back to the picker without clearing the cookie.
                                 router.push('/?app=');
@@ -449,7 +452,25 @@ const DashboardPage = () => {
                         </div>
                         <Button icon="pi pi-refresh" onClick={refresh} loading={loading} tooltip="Refresh" />
                         {appDetail && (
-                            <Button icon="pi pi-key" label="Show App ID & API Key" onClick={openCredentials} severity="info" outlined />
+                            <>
+                                <Menu
+                                    ref={moreMenu}
+                                    popup
+                                    model={[
+                                        {
+                                            label: 'Show API Key',
+                                            icon: 'pi pi-key',
+                                            command: openCredentials
+                                        }
+                                    ]}
+                                />
+                                <Button
+                                    icon="pi pi-ellipsis-v"
+                                    severity="secondary"
+                                    text
+                                    onClick={(e) => moreMenu.current?.toggle(e)}
+                                />
+                            </>
                         )}
                     </div>
                 </div>
