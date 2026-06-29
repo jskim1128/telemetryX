@@ -339,7 +339,8 @@ function buildSystemPrompt(appId: string | null): string {
         '- Always call a tool to fetch real data before stating numbers.\n' +
         '- Prefer the smallest useful tool (e.g. get_overview before get_time_series).\n' +
         '- When the user references "this app", "the app", or "the current app", use the scoped appId without asking.\n' +
-        '- Date defaults: last 30 days. If the user says "last week", "this month", etc., compute the ISO date range yourself.\n' +
+        '- You do NOT inherently know the current date (your training data has a cutoff). Whenever the user uses a relative date phrase ("today", "yesterday", "last week", "this month", "YTD", "the past 7 days", etc.), call get_current_datetime FIRST, then compute the ISO date range from its result.\n' +
+        '- Date defaults: last 30 days. Always pass concrete ISO dates to other tools — never guess "today".\n' +
         '- Be concise; format answers in clean markdown with short bullets or small tables.\n' +
         '- If a tool returns an error or zero data, say so plainly; do not guess.\n' +
         '- Never expose internal IDs unless explicitly asked.';

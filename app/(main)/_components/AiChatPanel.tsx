@@ -90,7 +90,11 @@ const AiChatPanel: React.FC<Props> = ({ visible, onHide }) => {
     // Cleanup any in-flight request when the panel closes.
     useEffect(() => {
         if (!visible && abortRef.current) {
-            abortRef.current.abort();
+            try {
+                abortRef.current.abort(new DOMException('Panel closed', 'AbortError'));
+            } catch {
+                /* ignore */
+            }
             abortRef.current = null;
         }
     }, [visible]);
@@ -249,7 +253,7 @@ const AiChatPanel: React.FC<Props> = ({ visible, onHide }) => {
                 .then((j) => j && setConversations(j.conversations || []))
                 .catch(() => { });
         } catch (err: any) {
-            if (controller.signal.aborted) {
+            if (controller.signal.aborted || err?.name === 'AbortError') {
                 setMessages((prev) =>
                     prev.map((m) => (m.id === assistantMsg.id ? { ...m, streaming: false } : m))
                 );
@@ -271,7 +275,11 @@ const AiChatPanel: React.FC<Props> = ({ visible, onHide }) => {
 
     const stop = () => {
         if (abortRef.current) {
-            abortRef.current.abort();
+            try {
+                abortRef.current.abort(new DOMException('Stopped by user', 'AbortError'));
+            } catch {
+                /* ignore */
+            }
             abortRef.current = null;
         }
     };
@@ -389,7 +397,14 @@ const AiChatPanel: React.FC<Props> = ({ visible, onHide }) => {
                                     key={s}
                                     type="button"
                                     className="ai-chat-suggestion"
-                                    onClick={() => send(s)}
+                                    // Stop propagation so PrimeReact's document-level
+                                    // outside-click handler (dismissable + non-modal Sidebar)
+                                    // doesn't see this click after React removes the empty
+                                    // state from the DOM, which would incorrectly close the panel.
+                                    onClick={(e) => {
+                                        e.nativeEvent.stopImmediatePropagation();
+                                        send(s);
+                                    }}
                                     disabled={sending}
                                 >
                                     <i className="pi pi-arrow-right mr-2 text-primary" style={{ fontSize: '0.75rem' }} />

@@ -29,6 +29,19 @@ export const AI_TOOLS: ToolDef[] = [
     {
         type: 'function',
         function: {
+            name: 'get_current_datetime',
+            description:
+                "Return the server's current date and time. Call this once at the start of a conversation whenever the user uses a relative date phrase like \"today\", \"yesterday\", \"last week\", \"this month\", \"YTD\", \"the past 7 days\", etc., so you can compute concrete ISO date ranges. The model's training cutoff means you do NOT know the real current date — always use this tool instead of guessing.",
+            parameters: {
+                type: 'object',
+                properties: {},
+                additionalProperties: false
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'list_apps',
             description: 'List the apps the current user can access. Use this when the user references an app by name and you need its id, or to enumerate apps for cross-app questions.',
             parameters: {
@@ -263,6 +276,20 @@ export async function executeTool(name: string, rawArgs: string, ctx: ToolContex
 
     try {
         switch (name) {
+            case 'get_current_datetime': {
+                const now = new Date();
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                return JSON.stringify({
+                    nowIso: now.toISOString(),
+                    nowUnixMs: now.getTime(),
+                    timezone,
+                    year: now.getUTCFullYear(),
+                    month: now.getUTCMonth() + 1,
+                    day: now.getUTCDate(),
+                    weekday: now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
+                    note: 'All fields are in UTC unless noted. Use nowIso as the authoritative reference when computing relative date ranges.'
+                });
+            }
             case 'list_apps': {
                 const apps = await prisma.app.findMany({
                     where: { active: true },
