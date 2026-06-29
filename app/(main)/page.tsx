@@ -404,7 +404,7 @@ const DashboardPage = () => {
     };
 
     // Build charts
-    const appLine = useMemo(() => buildLineChart(appStats?.series, appSeriesCategory), [appStats, appSeriesCategory]);
+    const appLine = useMemo(() => buildLineChart(appStats?.series, appSeriesCategory, effectiveRange(range)), [appStats, appSeriesCategory, range]);
     const appDepartmentChart = useMemo(() => buildDoughnut(appStats?.departments || []), [appStats]);
     const appFeatureChart = useMemo(() => buildPie((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [appStats]);
     const appFeatureTrendChart = useMemo(
@@ -1084,33 +1084,75 @@ const KpiCard = ({ label, value, icon, bg, color }: { label: string; value: numb
     </div>
 );
 
-function buildLineChart(rows: Array<{ day: string; category: string; count: number }> | undefined, category: SeriesCategory) {
-    if (!rows || rows.length === 0) {
+/** Format a Date as a local YYYY-MM-DD day key (avoids UTC drift). */
+function toDayKey(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+/** Build the inclusive list of YYYY-MM-DD day keys covering [from, to]. */
+function enumerateDays(from: Date, to: Date): string[] {
+    const days: string[] = [];
+    const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    while (cursor.getTime() <= end.getTime()) {
+        days.push(toDayKey(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return days;
+}
+
+function buildLineChart(
+    rows: Array<{ day: string; category: string; count: number }> | undefined,
+    category: SeriesCategory,
+    range?: { from: Date; to: Date } | null
+) {
+    const dayMap = new Map<string, { app_open: number; feature: number; tag: number }>();
+    if (rows) {
+        for (const row of rows) {
+            const dayKey = row.day.slice(0, 10);
+            if (!dayMap.has(dayKey)) dayMap.set(dayKey, { app_open: 0, feature: 0, tag: 0 });
+            const entry = dayMap.get(dayKey)!;
+            (entry as any)[row.category] = row.count;
+        }
+    }
+
+    // Prefer the selected date range for the x-axis so the chart always
+    // spans the full window (e.g. "Past month" shows all 30 days even if
+    // most are empty). Fall back to the days present in the data.
+    const days = range
+        ? enumerateDays(range.from, range.to)
+        : Array.from(dayMap.keys()).sort();
+
+    if (days.length === 0) {
         return {
             data: { labels: [], datasets: [] as any[] },
             options: { responsive: true, maintainAspectRatio: false }
         };
     }
-    const dayMap = new Map<string, { app_open: number; feature: number; tag: number }>();
-    for (const row of rows) {
-        const dayKey = row.day.slice(0, 10);
-        if (!dayMap.has(dayKey)) dayMap.set(dayKey, { app_open: 0, feature: 0, tag: 0 });
-        const entry = dayMap.get(dayKey)!;
-        (entry as any)[row.category] = row.count;
-    }
-    const days = Array.from(dayMap.keys()).sort();
+
     const color = CATEGORY_COLORS[category];
+    const spansMultipleYears = days.length > 0 && days[0].slice(0, 4) !== days[days.length - 1].slice(0, 4);
+    const displayLabels = days.map((d) => formatDayLabel(d, spansMultipleYears));
+    // Cap the number of x-axis ticks so longer ranges don't get cluttered.
+    // The actual labels are still all there for the tooltip; Chart.js just
+    // thins out which ones are drawn.
+    const maxTicks = Math.min(12, days.length);
     return {
         data: {
-            labels: days,
+            labels: displayLabels,
             datasets: [
                 {
                     label: SERIES_LABEL[category],
-                    data: days.map((d) => dayMap.get(d)![category]),
+                    data: days.map((d) => dayMap.get(d)?.[category] ?? 0),
                     borderColor: color,
                     backgroundColor: color,
                     tension: 0.3,
-                    fill: false
+                    fill: false,
+                    pointRadius: days.length > 60 ? 0 : 2,
+                    pointHoverRadius: 4
                 }
             ]
         },
@@ -1118,9 +1160,35 @@ function buildLineChart(rows: Array<{ day: string; category: string; count: numb
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            scales: {
+                x: {
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: maxTicks,
+                        maxRotation: 0,
+                        minRotation: 0
+                    },
+                    grid: { display: false }
+                },
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
         }
     };
+}
+
+/** Format a YYYY-MM-DD day key for x-axis display.
+ *  - "Jun 15" by default
+ *  - "Jun 15, 2025" when the range spans multiple years
+ */
+function formatDayLabel(dayKey: string, includeYear: boolean): string {
+    const [y, m, d] = dayKey.split('-').map((s) => Number(s));
+    if (!y || !m || !d) return dayKey;
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: includeYear ? 'numeric' : undefined
+    });
 }
 
 function buildDoughnut(rows: Array<{ department: string; count: number }>) {
