@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AutoComplete, AutoCompleteCompleteEvent, AutoCompleteSelectEvent } from 'primereact/autocomplete';
 import { Button } from 'primereact/button';
 import { Calendar } from 'primereact/calendar';
 import { Chart } from 'primereact/chart';
@@ -207,6 +206,10 @@ const DashboardPage = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const appIdFromUrl = searchParams?.get('app') || null;
+    // Whether the `app` query param key is present at all (even if empty).
+    // An empty `?app=` means the user explicitly opened the app picker, so we
+    // must NOT auto-restore the last app from the cookie in that case.
+    const appParamPresent = searchParams?.has('app') ?? false;
 
     const [range, setRange] = useState<[Date | null, Date | null]>(defaultRange());
     const activePreset = useMemo(() => detectPreset(range), [range]);
@@ -214,8 +217,6 @@ const DashboardPage = () => {
     // App list & search
     const [appsList, setAppsList] = useState<AppOption[]>([]);
     const [appsLoading, setAppsLoading] = useState(true);
-    const [searchValue, setSearchValue] = useState<AppOption | string | null>(null);
-    const [suggestions, setSuggestions] = useState<AppOption[]>([]);
     const [selectedAppId, setSelectedAppId] = useState<string | null>(appIdFromUrl);
 
     // Selection-page search
@@ -256,11 +257,11 @@ const DashboardPage = () => {
                     }));
                     setAppsList(list);
 
-                    if (appIdFromUrl) {
-                        const found = list.find((a) => a.id === appIdFromUrl);
-                        if (found) setSearchValue(found);
-                    } else {
-                        // No app in URL — try to restore from cookie.
+                    if (!appIdFromUrl && !appParamPresent) {
+                        // No `app` param in URL at all (fresh visit) — try to
+                        // restore the last app from the cookie. An explicit
+                        // empty `?app=` (the Apps button) skips this so the
+                        // picker is shown.
                         const remembered = readCookie(LAST_APP_COOKIE);
                         if (remembered) {
                             const found = list.find((a) => a.id === remembered);
@@ -286,12 +287,9 @@ const DashboardPage = () => {
     useEffect(() => {
         setSelectedAppId(appIdFromUrl);
         if (!appIdFromUrl) {
-            setSearchValue(null);
             setAppDetail(null);
             setAppStats(null);
         } else {
-            const found = appsList.find((a) => a.id === appIdFromUrl);
-            if (found) setSearchValue(found);
             // Persist the user's choice for next visit.
             writeCookie(LAST_APP_COOKIE, appIdFromUrl);
         }
@@ -332,25 +330,10 @@ const DashboardPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedAppId, range]);
 
-    const search = (event: AutoCompleteCompleteEvent) => {
-        const q = (event.query || '').toLowerCase().trim();
-        if (!q) {
-            setSuggestions(appsList);
-            return;
-        }
-        setSuggestions(appsList.filter((a) => a.name.toLowerCase().includes(q) || (a.ownerEmail || '').toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q)));
-    };
-
     const selectApp = (id: string) => {
         setSelectedAppId(id);
         writeCookie(LAST_APP_COOKIE, id);
         router.push(`/?app=${id}`);
-    };
-
-    const onSelectApp = (e: AutoCompleteSelectEvent) => {
-        const app = e.value as AppOption;
-        if (!app?.id) return;
-        selectApp(app.id);
     };
 
     const refresh = () => {
@@ -430,13 +413,6 @@ const DashboardPage = () => {
         [appTagTrendChart]
     );
 
-    const itemTemplate = (item: AppOption) => (
-        <div className="flex flex-column">
-            <span className="font-medium">{item.name}</span>
-            {item.ownerEmail && <small className="text-500">{item.ownerEmail}</small>}
-        </div>
-    );
-
     const title = selectedAppId ? (appDetail ? appDetail.name : 'Loading…') : 'Select an app';
 
     // === EMPTY STATE: app selector ===
@@ -457,53 +433,9 @@ const DashboardPage = () => {
             <Toast ref={toast} />
             <ConfirmDialog />
 
-            {/* Search + Title + Filters (no card wrapper, but padded to align with cards below) */}
+            {/* Title + Filters (no card wrapper, but padded to align with cards below) */}
             <div className="col-12">
                 <div className="px-5 mb-4">
-                    {/* Search bar row */}
-                    <div className="flex align-items-center gap-2 mb-3">
-                        <span className="p-input-icon-left flex-1">
-                            <i className="pi pi-search" />
-                            <AutoComplete
-                                value={searchValue}
-                                suggestions={suggestions}
-                                completeMethod={search}
-                                field="name"
-                                itemTemplate={itemTemplate}
-                                onChange={(e) => {
-                                    // Never allow the value to be cleared. If the user
-                                    // tries to empty the field, restore the previous
-                                    // selection on blur via the existing app match.
-                                    if (e.value === null || e.value === '') {
-                                        // Keep the current searchValue; ignore the change.
-                                        return;
-                                    }
-                                    setSearchValue(e.value);
-                                }}
-                                onSelect={onSelectApp}
-                                placeholder="Search apps by name, owner…"
-                                // dropdown
-                                forceSelection
-                                className="w-full"
-                                inputClassName="w-full pl-5"
-                            />
-                        </span>
-                        <Button
-                            label="Switch app"
-                            icon="pi pi-th-large"
-                            severity="secondary"
-                            text
-                            onClick={() => {
-                                // Send the user back to the picker without clearing the cookie.
-                                router.push('/?app=');
-                                setSelectedAppId(null);
-                                setSearchValue(null);
-                                setAppDetail(null);
-                                setAppStats(null);
-                            }}
-                        />
-                    </div>
-
                     {/* Title + filters */}
                     <div className="flex flex-column md:flex-row md:align-items-end gap-3 flex-wrap">
                         <div className="flex-1">

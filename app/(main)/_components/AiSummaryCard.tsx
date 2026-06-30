@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Message } from 'primereact/message';
-import { ProgressSpinner } from 'primereact/progressspinner';
+import { Skeleton } from 'primereact/skeleton';
 import { Tag } from 'primereact/tag';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -108,15 +108,17 @@ const AiSummaryCard: React.FC<Props> = ({ appId, range }) => {
 
                 {error && <Message severity="error" text={error} className="w-full mb-2" />}
 
-                {loading && !data && (
-                    <div className="flex align-items-center gap-3 py-3">
-                        <ProgressSpinner style={{ width: '1.75rem', height: '1.75rem' }} strokeWidth="4" />
-                        <span className="text-500">Analyzing tracking data…</span>
+                {loading && (
+                    <div className="ai-summary-body py-2">
+                        <Skeleton width="40%" height="1.25rem" className="mb-3" />
+                        <Skeleton width="100%" className="mb-2" />
+                        <Skeleton width="90%" className="mb-2" />
+                        <Skeleton width="75%" />
                     </div>
                 )}
 
-                {data && (
-                    <div className={`ai-summary-body ${loading ? 'opacity-60' : ''}`}>
+                {data && !loading && (
+                    <div className="ai-summary-body">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.summary}</ReactMarkdown>
                     </div>
                 )}

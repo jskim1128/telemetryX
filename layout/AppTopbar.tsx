@@ -8,6 +8,7 @@ import React, { forwardRef, useContext, useImperativeHandle, useMemo, useRef } f
 import { AppTopbarRef } from '@/types';
 import { LayoutContext } from './context/layoutcontext';
 import { useAuth } from './context/authcontext';
+import AppSearch from './AppSearch';
 import Logo from '@/public/assets/telemetryX.png'
 
 const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
@@ -74,12 +75,14 @@ const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
                 <span>Telemetry X</span>
             </Link>
 
+            <AppSearch />
+
             <button ref={topbarmenubuttonRef} type="button" className="p-link layout-topbar-menu-button layout-topbar-button" onClick={showProfileSidebar}>
                 <i className="pi pi-ellipsis-v" />
             </button>
 
             <div ref={topbarmenuRef} className={classNames('layout-topbar-menu', { 'layout-topbar-menu-mobile-active': layoutState.profileSidebarVisible })}>
-                <Link href="/apps">
+                <Link href="/?app=">
                     <button type="button" className="p-link layout-topbar-button">
                         <i className="pi pi-th-large"></i>
                         <span>Apps</span>

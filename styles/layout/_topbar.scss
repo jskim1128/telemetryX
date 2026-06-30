@@ -68,6 +68,42 @@
         margin-right: 0;
     }
 
+    .layout-topbar-search {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        margin: 0 2rem;
+
+        .p-input-icon-left {
+            width: 100%;
+            max-width: 32rem;
+            position: relative;
+
+            > i.pi-search {
+                position: absolute;
+                left: 0.75rem;
+                top: 50%;
+                margin-top: -0.5rem;
+                z-index: 1;
+                color: var(--text-color-secondary);
+            }
+        }
+
+        .p-autocomplete-input{
+            border-top: none !important;
+            border-left: none !important;
+            border-right: none !important;
+        }
+
+        .p-autocomplete {
+            width: 100%;
+
+            .p-inputtext {
+                padding-left: 2.5rem;
+            }
+        }
+    }
+
     .layout-topbar-menu-button {
         display: none;
 
@@ -91,6 +127,10 @@
 @media (max-width: 991px) {
     .layout-topbar {
         justify-content: space-between;
+
+        .layout-topbar-search {
+            display: none;
+        }
 
         .layout-topbar-logo {
             width: auto;
