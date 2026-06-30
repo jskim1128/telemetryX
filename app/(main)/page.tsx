@@ -21,6 +21,7 @@ import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import AiSummaryCard from './_components/AiSummaryCard';
+import InteractiveTrendChart from './_components/InteractiveTrendChart';
 
 interface AppOption {
     id: string;
@@ -417,6 +418,18 @@ const DashboardPage = () => {
         [appStats]
     );
 
+    // Reset interactive trend chart state whenever the underlying datasets
+    // change (e.g. a new app is loaded or the date range changes) so stale
+    // isolated/hover indices don't persist across datasets.
+    const featureTrendKey = useMemo(
+        () => appFeatureTrendChart.data.datasets.map((d: any) => d.label).join('|'),
+        [appFeatureTrendChart]
+    );
+    const tagTrendKey = useMemo(
+        () => appTagTrendChart.data.datasets.map((d: any) => d.label).join('|'),
+        [appTagTrendChart]
+    );
+
     const itemTemplate = (item: AppOption) => (
         <div className="flex flex-column">
             <span className="font-medium">{item.name}</span>
@@ -684,7 +697,11 @@ const DashboardPage = () => {
                                 {appFeatureTrendChart.data.datasets.length === 0 ? (
                                     <p className="text-500 m-0">No feature triggers yet.</p>
                                 ) : (
-                                    <Chart type="line" data={appFeatureTrendChart.data} options={appFeatureTrendChart.options} style={{ height: '100%', width: '100%' }} />
+                                    <InteractiveTrendChart
+                                        key={featureTrendKey}
+                                        data={appFeatureTrendChart.data}
+                                        options={appFeatureTrendChart.options}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -710,7 +727,11 @@ const DashboardPage = () => {
                                 {appTagTrendChart.data.datasets.length === 0 ? (
                                     <p className="text-500 m-0">No tag events yet.</p>
                                 ) : (
-                                    <Chart type="line" data={appTagTrendChart.data} options={appTagTrendChart.options} style={{ height: '100%', width: '100%' }} />
+                                    <InteractiveTrendChart
+                                        key={tagTrendKey}
+                                        data={appTagTrendChart.data}
+                                        options={appTagTrendChart.options}
+                                    />
                                 )}
                             </div>
                         </div>
