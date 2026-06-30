@@ -409,13 +409,13 @@ const DashboardPage = () => {
     const appDepartmentChart = useMemo(() => buildDoughnut(appStats?.departments || []), [appStats]);
     const appFeatureChart = useMemo(() => buildPie((appStats?.features || []).map((f) => ({ label: f.featureName, count: f.count })), PALETTE), [appStats]);
     const appFeatureTrendChart = useMemo(
-        () => buildTrendChart((appStats?.featureSeries || []).map((r) => ({ day: r.day, label: r.featureName, count: r.count }))),
-        [appStats]
+        () => buildTrendChart((appStats?.featureSeries || []).map((r) => ({ day: r.day, label: r.featureName, count: r.count })), effectiveRange(range)),
+        [appStats, range]
     );
     const appTagChart = useMemo(() => buildPie((appStats?.tags || []).map((t) => ({ label: t.tag, count: t.count })), PALETTE), [appStats]);
     const appTagTrendChart = useMemo(
-        () => buildTrendChart((appStats?.tagSeries || []).map((r) => ({ day: r.day, label: r.tag, count: r.count }))),
-        [appStats]
+        () => buildTrendChart((appStats?.tagSeries || []).map((r) => ({ day: r.day, label: r.tag, count: r.count })), effectiveRange(range)),
+        [appStats, range]
     );
 
     // Reset interactive trend chart state whenever the underlying datasets
@@ -677,7 +677,7 @@ const DashboardPage = () => {
                         </div>
                     </div>
 
-                    <div className="col-12 lg:col-6">
+                    <div className="col-12 lg:col-4">
                         <div className="card h-full flex flex-column">
                             <h5>Top features triggered</h5>
                             <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
@@ -690,7 +690,7 @@ const DashboardPage = () => {
                         </div>
                     </div>
 
-                    <div className="col-12 lg:col-6">
+                    <div className="col-12 lg:col-8">
                         <div className="card h-full flex flex-column">
                             <h5>Top features trend</h5>
                             <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
@@ -707,7 +707,7 @@ const DashboardPage = () => {
                         </div>
                     </div>
 
-                    <div className="col-12 lg:col-6">
+                    <div className="col-12 lg:col-4">
                         <div className="card h-full flex flex-column">
                             <h5>Top tags</h5>
                             <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
@@ -720,7 +720,7 @@ const DashboardPage = () => {
                         </div>
                     </div>
 
-                    <div className="col-12 lg:col-6">
+                    <div className="col-12 lg:col-8">
                         <div className="card h-full flex flex-column">
                             <h5>Top tags trend</h5>
                             <div className="flex-1" style={{ position: 'relative', minHeight: '320px' }}>
@@ -741,7 +741,15 @@ const DashboardPage = () => {
                         <div className="card h-full flex flex-column">
                             <h5>Top users</h5>
                             <div className="flex-1">
-                                <DataTable value={appStats.users} emptyMessage="No user activity yet." responsiveLayout="scroll">
+                                <DataTable
+                                    value={appStats.users}
+                                    emptyMessage="No user activity yet."
+                                    responsiveLayout="scroll"
+                                    paginator
+                                    rows={5}
+                                    scrollable
+                                    scrollHeight="360px"
+                                >
                                     <Column field="email" header="Email" />
                                     <Column
                                         field="topEvent"
@@ -764,16 +772,26 @@ const DashboardPage = () => {
                         </div>
                     </div>
 
-                    <div className="col-12">
-                        <div className="card">
+                    <div className="col-12 lg:col-6">
+                        <div className="card h-full flex flex-column">
                             <h5>Recent events</h5>
-                            <DataTable value={appStats.recent} emptyMessage="No events yet. Start sending tracking data via API." paginator rows={10} responsiveLayout="scroll">
-                                <Column header="When" body={(r: any) => new Date(r.createdAt).toLocaleString()} sortable sortField="createdAt" />
-                                <Column header="Type" body={(r: any) => <Tag severity={r.type === 'app_open' ? 'info' : r.type === 'feature' ? 'success' : 'warning'} value={typeLabel(r.type)} />} />
-                                <Column header="Details" body={(r: any) => r.label} />
-                                <Column header="Email" field="email" />
-                                <Column header="Department" body={(r: any) => r.department || <span className="text-500">—</span>} />
-                            </DataTable>
+                            <div className="flex-1">
+                                <DataTable
+                                    value={appStats.recent}
+                                    emptyMessage="No events yet. Start sending tracking data via API."
+                                    paginator
+                                    rows={5}
+                                    responsiveLayout="scroll"
+                                    scrollable
+                                    scrollHeight="360px"
+                                >
+                                    <Column header="When" body={(r: any) => new Date(r.createdAt).toLocaleString()} sortable sortField="createdAt" />
+                                    <Column header="Type" body={(r: any) => <Tag severity={r.type === 'app_open' ? 'info' : r.type === 'feature' ? 'success' : 'warning'} value={typeLabel(r.type)} />} />
+                                    <Column header="Details" body={(r: any) => r.label} />
+                                    <Column header="Email" field="email" />
+                                    <Column header="Department" body={(r: any) => r.department || <span className="text-500">—</span>} />
+                                </DataTable>
+                            </div>
                         </div>
                     </div>
                 </>
@@ -1243,7 +1261,10 @@ function buildPie(rows: Array<{ label: string; count: number }>, palette: string
  * count (descending) so the legend reads like a leaderboard. Used for
  * both the top-features and top-tags trend charts.
  */
-function buildTrendChart(rows: Array<{ day: string; label: string; count: number }> | undefined) {
+function buildTrendChart(
+    rows: Array<{ day: string; label: string; count: number }> | undefined,
+    range?: { from: Date; to: Date } | null
+) {
     if (!rows || rows.length === 0) {
         return {
             data: { labels: [] as string[], datasets: [] as any[] },
@@ -1251,21 +1272,28 @@ function buildTrendChart(rows: Array<{ day: string; label: string; count: number
         };
     }
 
-    // Collect the set of days and labels present.
-    const daySet = new Set<string>();
+    // Collect labels with their totals so the legend reads like a leaderboard.
     const totals = new Map<string, number>();
     for (const r of rows) {
-        daySet.add(r.day);
         totals.set(r.label, (totals.get(r.label) || 0) + r.count);
     }
-    const days = Array.from(daySet).sort();
     const labels = Array.from(totals.entries())
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name);
 
-    // Index rows for O(1) lookup when filling the grid.
+    // Prefer the selected date range for the x-axis so the chart always
+    // spans the full window (matching the "Events over time" chart). Fall
+    // back to the days present in the data if no range is provided.
+    const daysFromData = Array.from(new Set(rows.map((r) => r.day.slice(0, 10)))).sort();
+    const days = range ? enumerateDays(range.from, range.to) : daysFromData;
+
+    // Index rows for O(1) lookup when filling the grid (normalize to YYYY-MM-DD).
     const lookup = new Map<string, number>();
-    for (const r of rows) lookup.set(`${r.day}|${r.label}`, r.count);
+    for (const r of rows) lookup.set(`${r.day.slice(0, 10)}|${r.label}`, r.count);
+
+    const spansMultipleYears = days.length > 0 && days[0].slice(0, 4) !== days[days.length - 1].slice(0, 4);
+    const displayLabels = days.map((d) => formatDayLabel(d, spansMultipleYears));
+    const maxTicks = Math.min(12, days.length);
 
     const datasets = labels.map((label, i) => {
         const color = PALETTE[i % PALETTE.length];
@@ -1275,17 +1303,30 @@ function buildTrendChart(rows: Array<{ day: string; label: string; count: number
             borderColor: color,
             backgroundColor: color,
             tension: 0.3,
-            fill: false
+            fill: false,
+            pointRadius: days.length > 60 ? 0 : 2,
+            pointHoverRadius: 4
         };
     });
 
     return {
-        data: { labels: days, datasets },
+        data: { labels: displayLabels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { position: 'bottom' } },
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            scales: {
+                x: {
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: maxTicks,
+                        maxRotation: 0,
+                        minRotation: 0
+                    },
+                    grid: { display: false }
+                },
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
         }
     };
 }
