@@ -156,9 +156,11 @@ function formatRangeSummary(range: [Date | null, Date | null]): string {
 }
 
 /**
- * Normalize a selected range so server queries are inclusive AND always
- * extend up to "now" when the range's end is today or later. This ensures
- * events recorded after the page was loaded are included on refresh.
+ * Normalize a selected range so server queries are inclusive. When the
+ * user's selected end date is today, extend the upper bound to "now" so
+ * events recorded after the page was loaded are still included on
+ * refresh. For historical ranges (end date in the past), respect the
+ * user's chosen end-of-day so we don't leak data from outside the range.
  */
 function effectiveRange(range: [Date | null, Date | null]): { from: Date; to: Date } | null {
     const [rawFrom, rawTo] = range;
@@ -172,10 +174,14 @@ function effectiveRange(range: [Date | null, Date | null]): { from: Date; to: Da
     const toEnd = new Date(rawTo);
     toEnd.setHours(23, 59, 59, 999);
 
-    // Always ensure the upper bound is at least "now" so events created
-    // after page load are still included when the user clicks refresh.
+    // Only extend up to "now" when the selected end date is today; for
+    // historical ranges we must not include events past the user's
+    // chosen window.
     const now = new Date();
-    const to = new Date(Math.max(toEnd.getTime(), now.getTime()));
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+    const endsToday = toEnd.getTime() === todayEnd.getTime();
+    const to = endsToday ? new Date(Math.max(toEnd.getTime(), now.getTime())) : toEnd;
 
     return { from, to };
 }
