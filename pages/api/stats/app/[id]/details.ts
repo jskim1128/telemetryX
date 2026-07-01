@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '@/lib/prisma';
-import { getAllFeatureDetails, getAllTagDetails, getOverview, parseDateRange } from '@/lib/stats';
+import { getAllFeatureDetails, getAllTagDetails, getAppUsageSummary, getOverview, parseDateRange } from '@/lib/stats';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'GET') {
@@ -16,10 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const app = await prisma.app.findUnique({ where: { id }, select: { id: true, name: true } });
         if (!app) return res.status(404).json({ error: 'App not found' });
 
-        const [overview, features, tags] = await Promise.all([
+        const [overview, features, tags, usage] = await Promise.all([
             getOverview({ range, appId: id }),
             getAllFeatureDetails({ range, appId: id }),
-            getAllTagDetails({ range, appId: id })
+            getAllTagDetails({ range, appId: id }),
+            getAppUsageSummary({ range, appId: id })
         ]);
 
         return res.status(200).json({
@@ -27,7 +28,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             range,
             overview,
             features,
-            tags
+            tags,
+            usage
         });
     } catch (err) {
         console.error('app detail stats error', err);

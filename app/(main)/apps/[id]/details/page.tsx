@@ -18,6 +18,8 @@ import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { getBackgroundAndTextColorTuples } from '@/lib/colors';
 import ComboStatCard from '../../../_components/ComboStatCard';
+import MiniTrendChart, { TrendPoint } from '../../../_components/MiniTrendChart';
+import AppUsageCard, { AppUsageSummary } from '../../../_components/AppUsageCard';
 
 interface FeatureDetailRow {
     featureName: string;
@@ -25,6 +27,7 @@ interface FeatureDetailRow {
     uniqueUsers: number;
     firstSeen: string | null;
     lastSeen: string | null;
+    trend: TrendPoint[];
 }
 
 interface TagDetailRow {
@@ -33,6 +36,7 @@ interface TagDetailRow {
     uniqueUsers: number;
     firstSeen: string | null;
     lastSeen: string | null;
+    trend: TrendPoint[];
 }
 
 interface DetailResp {
@@ -44,6 +48,7 @@ interface DetailResp {
         tagInstances: number;
         uniqueUsers: number;
     };
+    usage: AppUsageSummary;
     features: FeatureDetailRow[];
     tags: TagDetailRow[];
 }
@@ -284,6 +289,11 @@ const AppDetailsPage = () => {
                 </div>
             ) : (
                 <>
+                    {/* App usage: total users, opens, and active-users trend */}
+                    <div className="col-12">
+                        <AppUsageCard summary={data?.usage} loading={loading} />
+                    </div>
+
                     {/* Features list */}
                     <div className="col-12 xl:col-6">
                         <div className="card h-full flex flex-column" style={{ maxHeight: '700px', overflow: 'auto' }}>
@@ -311,7 +321,8 @@ const AppDetailsPage = () => {
                                     name: f.featureName,
                                     count: f.count,
                                     uniqueUsers: f.uniqueUsers,
-                                    lastSeen: f.lastSeen
+                                    lastSeen: f.lastSeen,
+                                    trend: f.trend
                                 }))}
                                 max={maxFeatureCount}
                                 icon="pi-bolt"
@@ -348,7 +359,8 @@ const AppDetailsPage = () => {
                                     name: t.tag,
                                     count: t.count,
                                     uniqueUsers: t.uniqueUsers,
-                                    lastSeen: t.lastSeen
+                                    lastSeen: t.lastSeen,
+                                    trend: t.trend
                                 }))}
                                 max={maxTagCount}
                                 icon="pi-tag"
@@ -369,6 +381,7 @@ interface ListRow {
     count: number;
     uniqueUsers: number;
     lastSeen: string | null;
+    trend: TrendPoint[];
 }
 
 interface EventInstance {
@@ -462,9 +475,15 @@ const DetailList = ({
                     {/* Name + meta + bar */}
                     <div className="flex-1" style={{ minWidth: 0 }}>
                         <div className="flex align-items-center justify-content-between gap-2">
-                            <span className="font-medium text-900 white-space-nowrap overflow-hidden text-overflow-ellipsis" title={r.name}>
-                                {r.name}
-                            </span>
+                            <div className="flex align-items-center gap-2" style={{ minWidth: 0 }}>
+                                <span className="font-medium text-900 white-space-nowrap overflow-hidden text-overflow-ellipsis" title={r.name}>
+                                    {r.name}
+                                </span>
+                                {/* Mini line chart: trend of this feature/tag over the range. */}
+                                <span className="flex-shrink-0" title="Daily activity trend">
+                                    <MiniTrendChart trend={r.trend} color={accent} ariaLabel={`Trend for ${r.name}`} />
+                                </span>
+                            </div>
                             <Badge value={`${r.count.toLocaleString()} ${countLabel}`} style={{ background: accent }} />
                         </div>
                         <ProgressBar value={pct} showValue={false} className="mt-2" style={{ height: '6px' }} color={accent} />

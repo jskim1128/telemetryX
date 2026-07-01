@@ -325,12 +325,81 @@ export async function getTopTags(opts: { range: DateRange; appId?: string; limit
         .slice(0, limit);
 }
 
+/** A single point in a per-item daily trend (used for the mini line charts). */
+export interface TrendPoint {
+    day: string;
+    count: number;
+}
+
+/** A single day's active-user count (distinct emails that opened the app). */
+export interface ActiveUsersPoint {
+    day: string;
+    users: number;
+}
+
+/** App-level usage summary powering the "App usage" card on the details page:
+ * how many people used the app, how often they opened it, and the daily active
+ * user trend across the range. "Active user" = a distinct email with an
+ * app-open event on that day. */
+export interface AppUsageSummary {
+    /** Distinct users that opened the app in the range. */
+    totalUsers: number;
+    /** Total app-open events in the range. */
+    totalOpens: number;
+    /** Average opens per active user (0 when there are no users). */
+    avgOpensPerUser: number;
+    /** Peak single-day active-user count within the range. */
+    peakDailyUsers: number;
+    /** Dense daily active-user trend (one entry per day; 0 when inactive). */
+    trend: ActiveUsersPoint[];
+}
+
+/**
+ * Compute the {@link AppUsageSummary} for an app over a range. Active users are
+ * derived from app-open events; distinctness is per (day, email) for the trend
+ * and overall for the total. Bucketing is done in JS to stay portable across
+ * SQLite (dev) and PostgreSQL (prod).
+ */
+export async function getAppUsageSummary(opts: { range: DateRange; appId: string }): Promise<AppUsageSummary> {
+    const { range, appId } = opts;
+    const rows = await prisma.appOpenEvent.findMany({
+        where: { appId, createdAt: { gte: range.from, lte: range.to } },
+        select: { email: true, createdAt: true }
+    });
+
+    const dayKeys = enumerateDays(range);
+    const overallUsers = new Set<string>();
+    // Distinct users seen per day.
+    const usersPerDay = new Map<string, Set<string>>();
+
+    for (const r of rows) {
+        overallUsers.add(r.email);
+        const day = r.createdAt.toISOString().slice(0, 10);
+        let set = usersPerDay.get(day);
+        if (!set) {
+            set = new Set<string>();
+            usersPerDay.set(day, set);
+        }
+        set.add(r.email);
+    }
+
+    const trend: ActiveUsersPoint[] = dayKeys.map((day) => ({ day, users: usersPerDay.get(day)?.size ?? 0 }));
+
+    const totalUsers = overallUsers.size;
+    const totalOpens = rows.length;
+    const peakDailyUsers = trend.reduce((m, p) => Math.max(m, p.users), 0);
+    const avgOpensPerUser = totalUsers > 0 ? Math.round((totalOpens / totalUsers) * 10) / 10 : 0;
+
+    return { totalUsers, totalOpens, avgOpensPerUser, peakDailyUsers, trend };
+}
+
 export interface FeatureDetailRow {
     featureName: string;
     count: number;
     uniqueUsers: number;
     firstSeen: string | null;
     lastSeen: string | null;
+    trend: TrendPoint[];
 }
 
 export interface TagDetailRow {
@@ -339,6 +408,40 @@ export interface TagDetailRow {
     uniqueUsers: number;
     firstSeen: string | null;
     lastSeen: string | null;
+    trend: TrendPoint[];
+}
+
+/**
+ * Enumerate every calendar day (YYYY-MM-DD, UTC) spanned by a range,
+ * inclusive of both endpoints. Used to produce dense, gap-free trend arrays
+ * so the mini charts have a stable x-axis regardless of activity.
+ */
+function enumerateDays(range: DateRange): string[] {
+    const days: string[] = [];
+    const cursor = new Date(Date.UTC(range.from.getUTCFullYear(), range.from.getUTCMonth(), range.from.getUTCDate()));
+    const end = new Date(Date.UTC(range.to.getUTCFullYear(), range.to.getUTCMonth(), range.to.getUTCDate()));
+    // Guard against pathological ranges producing an unbounded loop.
+    let guard = 0;
+    while (cursor <= end && guard < 5000) {
+        days.push(cursor.toISOString().slice(0, 10));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+        guard += 1;
+    }
+    return days;
+}
+
+/**
+ * Build a dense daily trend from a set of event timestamps. Every day in the
+ * range is present (0 when there was no activity) so charts render a
+ * continuous line.
+ */
+function buildTrend(dayKeys: string[], timestamps: Date[]): TrendPoint[] {
+    const counts = new Map<string, number>();
+    for (const ts of timestamps) {
+        const day = ts.toISOString().slice(0, 10);
+        counts.set(day, (counts.get(day) || 0) + 1);
+    }
+    return dayKeys.map((day) => ({ day, count: counts.get(day) || 0 }));
 }
 
 /** Full (unlimited) breakdown of every feature for an app (or globally),
@@ -354,16 +457,18 @@ export async function getAllFeatureDetails(opts: { range: DateRange; appId?: str
         select: { featureName: true, email: true, createdAt: true }
     });
 
-    const agg = new Map<string, { count: number; users: Set<string>; first: Date; last: Date }>();
+    const dayKeys = enumerateDays(range);
+    const agg = new Map<string, { count: number; users: Set<string>; first: Date; last: Date; times: Date[] }>();
     for (const r of rows) {
         const cur = agg.get(r.featureName);
         if (cur) {
             cur.count += 1;
             cur.users.add(r.email);
+            cur.times.push(r.createdAt);
             if (r.createdAt < cur.first) cur.first = r.createdAt;
             if (r.createdAt > cur.last) cur.last = r.createdAt;
         } else {
-            agg.set(r.featureName, { count: 1, users: new Set([r.email]), first: r.createdAt, last: r.createdAt });
+            agg.set(r.featureName, { count: 1, users: new Set([r.email]), first: r.createdAt, last: r.createdAt, times: [r.createdAt] });
         }
     }
 
@@ -373,7 +478,8 @@ export async function getAllFeatureDetails(opts: { range: DateRange; appId?: str
             count: v.count,
             uniqueUsers: v.users.size,
             firstSeen: v.first.toISOString(),
-            lastSeen: v.last.toISOString()
+            lastSeen: v.last.toISOString(),
+            trend: buildTrend(dayKeys, v.times)
         }))
         .sort((a, b) => b.count - a.count);
 }
@@ -391,16 +497,18 @@ export async function getAllTagDetails(opts: { range: DateRange; appId?: string 
         select: { tag: true, email: true, createdAt: true }
     });
 
-    const agg = new Map<string, { count: number; users: Set<string>; first: Date; last: Date }>();
+    const dayKeys = enumerateDays(range);
+    const agg = new Map<string, { count: number; users: Set<string>; first: Date; last: Date; times: Date[] }>();
     for (const r of rows) {
         const cur = agg.get(r.tag);
         if (cur) {
             cur.count += 1;
             cur.users.add(r.email);
+            cur.times.push(r.createdAt);
             if (r.createdAt < cur.first) cur.first = r.createdAt;
             if (r.createdAt > cur.last) cur.last = r.createdAt;
         } else {
-            agg.set(r.tag, { count: 1, users: new Set([r.email]), first: r.createdAt, last: r.createdAt });
+            agg.set(r.tag, { count: 1, users: new Set([r.email]), first: r.createdAt, last: r.createdAt, times: [r.createdAt] });
         }
     }
 
@@ -410,7 +518,8 @@ export async function getAllTagDetails(opts: { range: DateRange; appId?: string 
             count: v.count,
             uniqueUsers: v.users.size,
             firstSeen: v.first.toISOString(),
-            lastSeen: v.last.toISOString()
+            lastSeen: v.last.toISOString(),
+            trend: buildTrend(dayKeys, v.times)
         }))
         .sort((a, b) => b.count - a.count);
 }
