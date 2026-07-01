@@ -17,6 +17,7 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { getBackgroundAndTextColorTuples } from '@/lib/colors';
+import ComboStatCard from '../../../_components/ComboStatCard';
 
 interface FeatureDetailRow {
     featureName: string;
@@ -283,29 +284,24 @@ const AppDetailsPage = () => {
                 </div>
             ) : (
                 <>
-                    {/* KPI summary */}
-                    {data && (
-                        <>
-                            <SummaryCard label="Total features" value={data.features.length} icon="pi-bolt" bg="bg-green-100" color="text-green-500" />
-                            <SummaryCard label="Feature triggers" value={data.overview.featureTriggers} icon="pi-chart-bar" bg="bg-green-100" color="text-green-500" />
-                            <SummaryCard label="Total tags" value={data.tags.length} icon="pi-tag" bg="bg-orange-100" color="text-orange-500" />
-                            <SummaryCard label="Tag instances" value={data.overview.tagInstances} icon="pi-chart-bar" bg="bg-orange-100" color="text-orange-500" />
-                        </>
-                    )}
-
                     {/* Features list */}
                     <div className="col-12 xl:col-6">
                         <div className="card h-full flex flex-column" style={{ maxHeight: '700px', overflow: 'auto' }}>
-                            <div className="flex flex-column md:flex-row md:justify-content-between md:align-items-center gap-2 mb-3">
-                                <div>
-                                    <h5 className="m-0">All features</h5>
-                                    <span className="text-500 text-sm">{data ? `${data.features.length} feature(s)` : '—'}</span>
-                                </div>
-                                <span className="p-input-icon-left">
-                                    <i className="pi pi-search" />
-                                    <InputText value={featureFilter} onChange={(e) => setFeatureFilter(e.target.value)} placeholder="Search features…" />
-                                </span>
-                            </div>
+                            <ComboStatCard
+                                title="Features"
+                                icon="pi-bolt"
+                                bg="bg-green-100"
+                                color="text-green-500"
+                                accent="green"
+                                primary={{ label: 'Total features', value: data ? data.features.length : 0 }}
+                                secondary={{ label: 'Triggers', value: data ? data.overview.featureTriggers : 0 }}
+                                search={
+                                    <span className="p-input-icon-left w-full">
+                                        <i className="pi pi-search" />
+                                        <InputText value={featureFilter} onChange={(e) => setFeatureFilter(e.target.value)} placeholder="Search features…" className="w-full" />
+                                    </span>
+                                }
+                            />
                             <DetailList
                                 appId={id}
                                 type="feature"
@@ -328,16 +324,21 @@ const AppDetailsPage = () => {
                     {/* Tags list */}
                     <div className="col-12 xl:col-6">
                         <div className="card h-full flex flex-column" style={{ maxHeight: '700px', overflow: 'auto' }}>
-                            <div className="flex flex-column md:flex-row md:justify-content-between md:align-items-center gap-2 mb-3">
-                                <div>
-                                    <h5 className="m-0">All tags</h5>
-                                    <span className="text-500 text-sm">{data ? `${data.tags.length} tag(s)` : '—'}</span>
-                                </div>
-                                <span className="p-input-icon-left">
-                                    <i className="pi pi-search" />
-                                    <InputText value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Search tags…" />
-                                </span>
-                            </div>
+                            <ComboStatCard
+                                title="Tags"
+                                icon="pi-tag"
+                                bg="bg-orange-100"
+                                color="text-orange-500"
+                                accent="orange"
+                                primary={{ label: 'Total tags', value: data ? data.tags.length : 0 }}
+                                secondary={{ label: 'Instances', value: data ? data.overview.tagInstances : 0 }}
+                                search={
+                                    <span className="p-input-icon-left w-full">
+                                        <i className="pi pi-search" />
+                                        <InputText value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Search tags…" className="w-full" />
+                                    </span>
+                                }
+                            />
                             <DetailList
                                 appId={id}
                                 type="tag"
@@ -594,21 +595,5 @@ const InstanceDetail = ({
         </div>
     );
 };
-
-const SummaryCard = ({ label, value, icon, bg, color }: { label: string; value: number; icon: string; bg: string; color: string }) => (
-    <div className="col-12 sm:col-6 xl:col-3">
-        <div className="card mb-0">
-            <div className="flex justify-content-between mb-3">
-                <div>
-                    <span className="block text-500 font-medium mb-3">{label}</span>
-                    <div className="text-900 font-medium text-xl">{value.toLocaleString()}</div>
-                </div>
-                <div className={`flex align-items-center justify-content-center ${bg} border-round`} style={{ width: '2.5rem', height: '2.5rem' }}>
-                    <i className={`pi ${icon} ${color} text-xl`} />
-                </div>
-            </div>
-        </div>
-    </div>
-);
 
 export default AppDetailsPage;
