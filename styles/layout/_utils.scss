@@ -54,3 +54,12 @@
         background: var(--surface-hover);
     }
 }
+
+/* Expandable feature/tag detail rows on the full-data page */
+.detail-list-row {
+    transition: background-color 120ms ease;
+
+    &:hover {
+        background: var(--surface-hover);
+    }
+}

@@ -324,3 +324,147 @@ export async function getTopTags(opts: { range: DateRange; appId?: string; limit
         .sort((a, b) => b.count - a.count)
         .slice(0, limit);
 }
+
+export interface FeatureDetailRow {
+    featureName: string;
+    count: number;
+    uniqueUsers: number;
+    firstSeen: string | null;
+    lastSeen: string | null;
+}
+
+export interface TagDetailRow {
+    tag: string;
+    count: number;
+    uniqueUsers: number;
+    firstSeen: string | null;
+    lastSeen: string | null;
+}
+
+/** Full (unlimited) breakdown of every feature for an app (or globally),
+ * with total count, unique users, and first/last-seen timestamps. Powers
+ * the "full data" detail page. */
+export async function getAllFeatureDetails(opts: { range: DateRange; appId?: string }): Promise<FeatureDetailRow[]> {
+    const { range, appId } = opts;
+    const where: any = { createdAt: { gte: range.from, lte: range.to } };
+    if (appId) where.appId = appId;
+
+    const rows = await prisma.featureEvent.findMany({
+        where,
+        select: { featureName: true, email: true, createdAt: true }
+    });
+
+    const agg = new Map<string, { count: number; users: Set<string>; first: Date; last: Date }>();
+    for (const r of rows) {
+        const cur = agg.get(r.featureName);
+        if (cur) {
+            cur.count += 1;
+            cur.users.add(r.email);
+            if (r.createdAt < cur.first) cur.first = r.createdAt;
+            if (r.createdAt > cur.last) cur.last = r.createdAt;
+        } else {
+            agg.set(r.featureName, { count: 1, users: new Set([r.email]), first: r.createdAt, last: r.createdAt });
+        }
+    }
+
+    return Array.from(agg.entries())
+        .map(([featureName, v]) => ({
+            featureName,
+            count: v.count,
+            uniqueUsers: v.users.size,
+            firstSeen: v.first.toISOString(),
+            lastSeen: v.last.toISOString()
+        }))
+        .sort((a, b) => b.count - a.count);
+}
+
+/** Full (unlimited) breakdown of every tag for an app (or globally), with
+ * total count, unique users, and first/last-seen timestamps. Mirrors
+ * {@link getAllFeatureDetails}. */
+export async function getAllTagDetails(opts: { range: DateRange; appId?: string }): Promise<TagDetailRow[]> {
+    const { range, appId } = opts;
+    const where: any = { createdAt: { gte: range.from, lte: range.to } };
+    if (appId) where.appId = appId;
+
+    const rows = await prisma.tagEvent.findMany({
+        where,
+        select: { tag: true, email: true, createdAt: true }
+    });
+
+    const agg = new Map<string, { count: number; users: Set<string>; first: Date; last: Date }>();
+    for (const r of rows) {
+        const cur = agg.get(r.tag);
+        if (cur) {
+            cur.count += 1;
+            cur.users.add(r.email);
+            if (r.createdAt < cur.first) cur.first = r.createdAt;
+            if (r.createdAt > cur.last) cur.last = r.createdAt;
+        } else {
+            agg.set(r.tag, { count: 1, users: new Set([r.email]), first: r.createdAt, last: r.createdAt });
+        }
+    }
+
+    return Array.from(agg.entries())
+        .map(([tag, v]) => ({
+            tag,
+            count: v.count,
+            uniqueUsers: v.users.size,
+            firstSeen: v.first.toISOString(),
+            lastSeen: v.last.toISOString()
+        }))
+        .sort((a, b) => b.count - a.count);
+}
+
+export interface EventInstance {
+    id: string;
+    email: string;
+    department: string | null;
+    createdAt: string;
+}
+
+/** Individual feature-trigger instances (who + when) for a single feature
+ * name within the range, newest first. Powers the expandable detail rows on
+ * the "full data" page. */
+export async function getFeatureInstances(opts: {
+    range: DateRange;
+    appId: string;
+    featureName: string;
+    limit?: number;
+}): Promise<EventInstance[]> {
+    const { range, appId, featureName, limit = 200 } = opts;
+    const rows = await prisma.featureEvent.findMany({
+        where: { appId, featureName, createdAt: { gte: range.from, lte: range.to } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: { id: true, email: true, department: true, createdAt: true }
+    });
+    return rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        department: r.department,
+        createdAt: r.createdAt.toISOString()
+    }));
+}
+
+/** Individual tag instances (who + when) for a single tag value within the
+ * range, newest first. Mirrors {@link getFeatureInstances}. */
+export async function getTagInstances(opts: {
+    range: DateRange;
+    appId: string;
+    tag: string;
+    limit?: number;
+}): Promise<EventInstance[]> {
+    const { range, appId, tag, limit = 200 } = opts;
+    const rows = await prisma.tagEvent.findMany({
+        where: { appId, tag, createdAt: { gte: range.from, lte: range.to } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: { id: true, email: true, department: true, createdAt: true }
+    });
+    return rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        department: r.department,
+        createdAt: r.createdAt.toISOString()
+    }));
+}

@@ -415,6 +415,20 @@ const DashboardPage = () => {
 
     const title = selectedAppId ? (appDetail ? appDetail.name : 'Loading…') : 'Select an app';
 
+    // Link to the full-data detail page, carrying the current date range so
+    // the detail view opens with the same window the user is looking at.
+    const detailsHref = useMemo(() => {
+        if (!selectedAppId) return '#';
+        const eff = effectiveRange(range);
+        const qs = new URLSearchParams();
+        if (eff) {
+            qs.set('from', eff.from.toISOString());
+            qs.set('to', eff.to.toISOString());
+        }
+        const suffix = qs.toString();
+        return `/apps/${selectedAppId}/details${suffix ? `?${suffix}` : ''}`;
+    }, [selectedAppId, range]);
+
     // === EMPTY STATE: app selector ===
     if (!selectedAppId) {
         return (
@@ -611,7 +625,12 @@ const DashboardPage = () => {
 
                     <div className="col-12 lg:col-4">
                         <div className="card h-full flex flex-column">
-                            <h5>Top features triggered</h5>
+                            <div className="flex align-items-center justify-content-between gap-2 mb-2">
+                                <h5 className="m-0">Top features triggered</h5>
+                                <Link href={detailsHref} className="text-primary text-sm font-medium no-underline white-space-nowrap">
+                                    View full data <i className="pi pi-arrow-right" style={{ fontSize: '0.7rem' }} />
+                                </Link>
+                            </div>
                             <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
                                 {appStats.features.length === 0 ? (
                                     <p className="text-500 m-0">No feature triggers yet.</p>
@@ -641,7 +660,12 @@ const DashboardPage = () => {
 
                     <div className="col-12 lg:col-4">
                         <div className="card h-full flex flex-column">
-                            <h5>Top tags</h5>
+                            <div className="flex align-items-center justify-content-between gap-2 mb-2">
+                                <h5 className="m-0">Top tags</h5>
+                                <Link href={detailsHref} className="text-primary text-sm font-medium no-underline white-space-nowrap">
+                                    View full data <i className="pi pi-arrow-right" style={{ fontSize: '0.7rem' }} />
+                                </Link>
+                            </div>
                             <div className="flex-1 flex align-items-center justify-content-center" style={{ minHeight: '320px' }}>
                                 {appStats.tags.length === 0 ? (
                                     <p className="text-500 m-0">No tag events yet.</p>
