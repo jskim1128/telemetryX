@@ -42,3 +42,7 @@ prisma/migrations/dev.db*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# secret file
+k8s/20-app-secret.yaml
