@@ -113,8 +113,8 @@ const AppSearch = () => {
                     }}
                     onSelect={onSelect}
                     placeholder="Search apps by name, owner…"
-                    className="w-full ml-2"
-                    inputClassName="w-full pl-5"
+                    className="w-full"
+                    inputClassName="w-full pl-6"
                 />
             </span>
         </div>

@@ -6490,15 +6490,16 @@
 
   .p-tieredmenu .p-menuitem.p-menuitem-active>.p-menuitem-link {
     background: #0f766e;
+    color: var(--primary-color-text) !important;
   }
 
   .p-tieredmenu .p-menuitem.p-menuitem-active>.p-menuitem-link .p-menuitem-text {
-    color: #0f766e;
+    color: var(--primary-color-text) !important;
   }
 
   .p-tieredmenu .p-menuitem.p-menuitem-active>.p-menuitem-link .p-menuitem-icon,
   .p-tieredmenu .p-menuitem.p-menuitem-active>.p-menuitem-link .p-submenu-icon {
-    color: #0f766e;
+    color: var(--primary-color-text) !important;
   }
 
   .p-tieredmenu .p-menu-separator {
