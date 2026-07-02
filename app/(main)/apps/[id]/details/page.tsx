@@ -265,6 +265,7 @@ const AppDetailsPage = () => {
                                             inline
                                             numberOfMonths={1}
                                             maxDate={new Date()}
+                                            selectOtherMonths
                                             readOnlyInput
                                         />
                                         <div className="flex justify-content-between align-items-center mt-2 pt-2 border-top-1 surface-border">
