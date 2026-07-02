@@ -85,6 +85,231 @@
         margin: 0.5rem 0;
         color: var(--text-color-secondary);
     }
+
+    // Bullets rendered by the custom ReactMarkdown <li> renderer: each carries
+    // a leading category icon, so drop the native marker and lay it out as a
+    // flex row (icon + text).
+    ul {
+        list-style: none;
+        margin-left: 0;
+    }
+
+    li.ai-bullet {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        margin: 0.35rem 0;
+
+        > i {
+            flex: 0 0 auto;
+            margin-top: 0.15rem;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+        }
+
+        // The neutral fallback dot is intentionally tiny + muted.
+        > i.pi-circle-fill {
+            font-size: 0.4rem;
+            margin-top: 0.5rem;
+            color: var(--text-color-secondary);
+        }
+    }
+
+    // The single actionable suggestion is promoted to a highlighted callout.
+    li.ai-suggestion-callout {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        list-style: none;
+        margin: 0.6rem 0 0.15rem;
+        padding: 0.6rem 0.75rem;
+        background: var(--surface-50);
+        border: 1px solid var(--surface-border);
+        border-left: 3px solid var(--primary-color);
+        border-radius: var(--border-radius);
+
+        > i {
+            flex: 0 0 auto;
+            margin-top: 0.1rem;
+            color: var(--yellow-500, #eab308);
+            font-size: 1rem;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AI Summary Card — data-driven visual band (KPI chips + trend sparkline)
+// ---------------------------------------------------------------------------
+.ai-summary-visuals {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.ai-summary-kpis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    flex: 1 1 auto;
+}
+
+.ai-kpi-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius);
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    min-width: 8.5rem;
+
+    > i {
+        font-size: 1.1rem;
+        width: 1.9rem;
+        height: 1.9rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
+
+    .ai-kpi-meta {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+    }
+
+    .ai-kpi-value {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: var(--text-color);
+    }
+
+    .ai-kpi-label {
+        font-size: 0.75rem;
+        color: var(--text-color-secondary);
+    }
+}
+
+// Per-KPI accent tints (mirror the dashboard KPI card colors).
+.ai-kpi-blue > i {
+    background: var(--blue-100, #e3f2fd);
+    color: var(--blue-500, #2196f3);
+}
+
+.ai-kpi-green > i {
+    background: var(--green-100, #e8f5e9);
+    color: var(--green-500, #4caf50);
+}
+
+.ai-kpi-purple > i {
+    background: var(--purple-100, #f3e5f5);
+    color: var(--purple-500, #9c27b0);
+}
+
+.ai-kpi-orange > i {
+    background: var(--orange-100, #fff3e0);
+    color: var(--orange-500, #ff9800);
+}
+
+.ai-trend {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 0 0 auto;
+}
+
+.ai-trend-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+
+    i {
+        font-size: 0.75rem;
+    }
+
+    &.up {
+        color: var(--green-600, #16a34a);
+        background: var(--green-100, #dcfce7);
+    }
+
+    &.down {
+        color: var(--red-600, #dc2626);
+        background: var(--red-100, #fee2e2);
+    }
+
+    &.flat {
+        color: var(--text-color-secondary);
+        background: var(--surface-100);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AI Summary Card — top-feature share bars
+// ---------------------------------------------------------------------------
+.ai-feature-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.ai-feature-bars-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-color-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.1rem;
+}
+
+.ai-feature-bar-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 9rem) 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.ai-feature-bar-label {
+    font-size: 0.85rem;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-feature-bar-track {
+    position: relative;
+    height: 0.55rem;
+    background: var(--surface-200);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.ai-feature-bar-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-400, var(--primary-color)));
+    transition: width 300ms ease;
+}
+
+.ai-feature-bar-count {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-color-secondary);
+    min-width: 2.5rem;
+    text-align: right;
 }
 
 // ---------------------------------------------------------------------------

@@ -16,11 +16,13 @@ import { OverlayPanel } from 'primereact/overlaypanel';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { ScrollPanel } from 'primereact/scrollpanel';
 import { SelectButton } from 'primereact/selectbutton';
+import { Skeleton } from 'primereact/skeleton';
 import { Tag } from 'primereact/tag';
 import { Toast } from 'primereact/toast';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import AiSummaryCard from './_components/AiSummaryCard';
 import InteractiveTrendChart from './_components/InteractiveTrendChart';
+import { DashboardSkeleton } from './loading';
 
 interface AppOption {
     id: string;
@@ -419,7 +421,7 @@ const DashboardPage = () => {
         [appTagTrendChart]
     );
 
-    const title = selectedAppId ? (appDetail ? appDetail.name : 'Loading…') : 'Select an app';
+    const title = selectedAppId ? (appDetail ? appDetail.name : null) : 'Select an app';
 
     // Link to the full-data detail page, carrying the current date range so
     // the detail view opens with the same window the user is looking at.
@@ -460,7 +462,11 @@ const DashboardPage = () => {
                     <div className="flex flex-column md:flex-row md:align-items-end gap-3 flex-wrap">
                         <div className="flex-1">
                             <div className="flex align-items-center gap-2 flex-wrap">
-                                <h3 className="m-0">{title}</h3>
+                                {title === null ? (
+                                    <Skeleton width="14rem" height="2rem" />
+                                ) : (
+                                    <h3 className="m-0">{title}</h3>
+                                )}
                                 {appDetail && (appDetail.active ? <Tag severity="success" value="Active" /> : <Tag severity="danger" value="Disabled" />)}
                             </div>
                         </div>
@@ -587,10 +593,22 @@ const DashboardPage = () => {
                 </div>
             </div>
 
+            {/* === LOADING SKELETON ===
+                Shown while data is being fetched and there is nothing to
+                display yet (initial load or switching apps). During a refresh
+                of already-loaded data, the existing content stays visible. */}
+            {loading && !appStats && <DashboardSkeleton />}
+
             {/* === APP-SPECIFIC VIEW === */}
             {appStats && (
                 <>
-                    <AiSummaryCard appId={appStats.app.id} range={effectiveRange(range)} />
+                    <AiSummaryCard
+                        appId={appStats.app.id}
+                        range={effectiveRange(range)}
+                        overview={appStats.overview}
+                        series={appStats.series}
+                        features={appStats.features}
+                    />
 
                     <KpiCard label="App opens" value={appStats.overview.appOpens} icon="pi-sign-in" bg="bg-blue-100" color="text-blue-500" />
                     <KpiCard label="Feature triggers" value={appStats.overview.featureTriggers} icon="pi-bolt" bg="bg-green-100" color="text-green-500" />

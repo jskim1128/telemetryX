@@ -80,7 +80,15 @@ export const DASHBOARD_WIDGETS: DashboardWidget[] = [
         title: 'AI Summary',
         defaultVisible: true,
         colClass: 'col-12',
-        render: (ctx) => <AiSummaryCard appId={ctx.appStats.app.id} range={ctx.effectiveRangeForAi} />
+        render: (ctx) => (
+            <AiSummaryCard
+                appId={ctx.appStats.app.id}
+                range={ctx.effectiveRangeForAi}
+                overview={ctx.appStats.overview}
+                series={ctx.appStats.series}
+                features={ctx.appStats.features}
+            />
+        )
     },
     {
         id: 'kpi-app-opens',
