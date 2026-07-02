@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Avatar } from 'primereact/avatar';
 import { Badge } from 'primereact/badge';
@@ -20,6 +20,8 @@ import { getBackgroundAndTextColorTuples } from '@/lib/colors';
 import ComboStatCard from '../../../_components/ComboStatCard';
 import MiniTrendChart, { TrendPoint } from '../../../_components/MiniTrendChart';
 import AppUsageCard, { AppUsageSummary } from '../../../_components/AppUsageCard';
+import SearchChips from '../../../_components/SearchChips';
+import { useSearchHistory, SearchEntry } from '../../../_components/useSearchHistory';
 
 interface FeatureDetailRow {
     featureName: string;
@@ -132,6 +134,30 @@ function formatDateTime(iso: string | null): string {
     return new Date(iso).toLocaleString();
 }
 
+// Build a predicate for filtering names. Supports plain substring or regex
+// matching, each optionally case-sensitive. Returns `{ matcher, error }` where
+// an invalid regex pattern yields a matcher that matches nothing plus an error
+// message for display.
+function buildMatcher(query: string, useRegex: boolean, caseSensitive: boolean): { matcher: (value: string) => boolean; error: string | null } {
+    const q = query.trim();
+    if (!q) return { matcher: () => true, error: null };
+
+    if (useRegex) {
+        try {
+            const re = new RegExp(q, caseSensitive ? '' : 'i');
+            return { matcher: (value: string) => re.test(value), error: null };
+        } catch (err: any) {
+            return { matcher: () => false, error: err?.message || 'Invalid regular expression' };
+        }
+    }
+
+    if (caseSensitive) {
+        return { matcher: (value: string) => value.includes(q), error: null };
+    }
+    const lowered = q.toLowerCase();
+    return { matcher: (value: string) => value.toLowerCase().includes(lowered), error: null };
+}
+
 const AppDetailsPage = () => {
     const params = useParams<{ id: string }>();
     const id = params?.id as string;
@@ -150,6 +176,28 @@ const AppDetailsPage = () => {
 
     const [featureFilter, setFeatureFilter] = useState('');
     const [tagFilter, setTagFilter] = useState('');
+
+    // Search options: regex + case sensitivity, per list.
+    const [featureRegex, setFeatureRegex] = useState(false);
+    const [featureCase, setFeatureCase] = useState(false);
+    const [tagRegex, setTagRegex] = useState(false);
+    const [tagCase, setTagCase] = useState(false);
+
+    // Persisted search history + favourites, scoped per app + list type.
+    const featureHistory = useSearchHistory(id, 'feature');
+    const tagHistory = useSearchHistory(id, 'tag');
+
+    // Apply a saved/favourite search: fill the input and restore its flags.
+    const applyFeatureEntry = useCallback((entry: SearchEntry) => {
+        setFeatureFilter(entry.query);
+        setFeatureRegex(entry.regex);
+        setFeatureCase(entry.caseSensitive);
+    }, []);
+    const applyTagEntry = useCallback((entry: SearchEntry) => {
+        setTagFilter(entry.query);
+        setTagRegex(entry.regex);
+        setTagCase(entry.caseSensitive);
+    }, []);
 
     const load = async () => {
         if (!id) return;
@@ -185,17 +233,46 @@ const AppDetailsPage = () => {
 
     // Filter (by name) + sort (by count desc) for the list views. Sorting is
     // fixed to most-triggered first so the list reads like a leaderboard.
+    const featureMatch = useMemo(() => buildMatcher(featureFilter, featureRegex, featureCase), [featureFilter, featureRegex, featureCase]);
+    const tagMatch = useMemo(() => buildMatcher(tagFilter, tagRegex, tagCase), [tagFilter, tagRegex, tagCase]);
+
     const filteredFeatures = useMemo(() => {
-        const q = featureFilter.trim().toLowerCase();
-        const rows = q ? (data?.features || []).filter((f) => f.featureName.toLowerCase().includes(q)) : data?.features || [];
+        const rows = (data?.features || []).filter((f) => featureMatch.matcher(f.featureName));
         return [...rows].sort((a, b) => b.count - a.count);
-    }, [data, featureFilter]);
+    }, [data, featureMatch]);
 
     const filteredTags = useMemo(() => {
-        const q = tagFilter.trim().toLowerCase();
-        const rows = q ? (data?.tags || []).filter((t) => t.tag.toLowerCase().includes(q)) : data?.tags || [];
+        const rows = (data?.tags || []).filter((t) => tagMatch.matcher(t.tag));
         return [...rows].sort((a, b) => b.count - a.count);
-    }, [data, tagFilter]);
+    }, [data, tagMatch]);
+
+    // Record searches into history only on explicit submit (Enter), and only
+    // when the query is non-empty and (if regex) valid. Keeps history clean of
+    // partial keystrokes and broken patterns.
+    const recordFeature = featureHistory.record;
+    const submitFeatureSearch = useCallback(() => {
+        const q = featureFilter.trim();
+        if (!q || featureMatch.error) return;
+        recordFeature(q, featureRegex, featureCase);
+    }, [featureFilter, featureRegex, featureCase, featureMatch.error, recordFeature]);
+
+    const recordTag = tagHistory.record;
+    const submitTagSearch = useCallback(() => {
+        const q = tagFilter.trim();
+        if (!q || tagMatch.error) return;
+        recordTag(q, tagRegex, tagCase);
+    }, [tagFilter, tagRegex, tagCase, tagMatch.error, recordTag]);
+
+    // Is the current query (with its flags) already a favourite? Drives the
+    // star toggle button state in each search box.
+    const featureFavourited = useMemo(() => {
+        const q = featureFilter.trim();
+        return featureHistory.favourites.some((e) => e.query === q && e.regex === featureRegex && e.caseSensitive === featureCase);
+    }, [featureHistory.favourites, featureFilter, featureRegex, featureCase]);
+    const tagFavourited = useMemo(() => {
+        const q = tagFilter.trim();
+        return tagHistory.favourites.some((e) => e.query === q && e.regex === tagRegex && e.caseSensitive === tagCase);
+    }, [tagHistory.favourites, tagFilter, tagRegex, tagCase]);
 
     // Max counts drive the proportional bar widths in each list.
     const maxFeatureCount = useMemo(() => filteredFeatures.reduce((m, f) => Math.max(m, f.count), 0), [filteredFeatures]);
@@ -307,11 +384,77 @@ const AppDetailsPage = () => {
                                 primary={{ label: 'Total features', value: data ? data.features.length : 0 }}
                                 secondary={{ label: 'Triggers', value: data ? data.overview.featureTriggers : 0 }}
                                 search={
-                                    <span className="p-input-icon-left w-full">
-                                        <i className="pi pi-search" />
-                                        <InputText value={featureFilter} onChange={(e) => setFeatureFilter(e.target.value)} placeholder="Search features…" className="w-full" />
-                                    </span>
+                                    <div className="p-inputgroup w-full">
+                                        <span className="p-input-icon-left flex-1" style={{ minWidth: '120px' }}>
+                                            <i className="pi pi-search" />
+                                            <InputText
+                                                value={featureFilter}
+                                                onChange={(e) => setFeatureFilter(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') submitFeatureSearch();
+                                                }}
+                                                placeholder={featureRegex ? 'Search features (regex)…' : 'Search features…'}
+                                                className={`w-full${featureMatch.error ? ' p-invalid' : ''}`}
+                                                style={{ minWidth: '120px' }}
+                                            />
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            label="Aa"
+                                            severity="secondary"
+                                            text={!featureCase}
+                                            aria-pressed={featureCase}
+                                            onClick={() => setFeatureCase((v) => !v)}
+                                            tooltip="Case sensitive"
+                                            tooltipOptions={{ position: 'top' }}
+                                            size='small'
+                                            className="flex-shrink-0"
+                                            style={{padding: "0.5rem"}}
+                                        />
+                                        <Button
+                                            type="button"
+                                            label=".*"
+                                            severity="secondary"
+                                            text={!featureRegex}
+                                            aria-pressed={featureRegex}
+                                            onClick={() => setFeatureRegex((v) => !v)}
+                                            tooltip="Use regular expression"
+                                            tooltipOptions={{ position: 'top' }}
+                                            size='small'
+                                            className="flex-shrink-0"
+                                            style={{padding: "0.5rem"}}
+                                        />
+                                        <Button
+                                            type="button"
+                                            icon={featureFavourited ? 'pi pi-star-fill' : 'pi pi-star'}
+                                            severity="secondary"
+                                            text
+                                            disabled={!featureFilter.trim() || !!featureMatch.error}
+                                            aria-pressed={featureFavourited}
+                                            onClick={() => featureHistory.toggleFavourite(featureFilter, featureRegex, featureCase)}
+                                            tooltip={featureFavourited ? 'Remove from favourites' : 'Save to favourites'}
+                                            tooltipOptions={{ position: 'top' }}
+                                            size='small'
+                                            className={`flex-shrink-0${featureFavourited ? ' text-yellow-500' : ''}`}
+                                            style={{padding: "0.5rem"}}
+                                        />
+                                    </div>
                                 }
+                            />
+                            {featureMatch.error && (
+                                <small className="p-error px-3 pb-2">Invalid regex: {featureMatch.error}</small>
+                            )}
+                            <SearchChips
+                                favourites={featureHistory.favourites}
+                                recents={featureHistory.recents}
+                                activeQuery={featureFilter}
+                                activeRegex={featureRegex}
+                                activeCase={featureCase}
+                                accent="green"
+                                onApply={applyFeatureEntry}
+                                onToggleFavourite={(e) => featureHistory.toggleFavourite(e.query, e.regex, e.caseSensitive)}
+                                onRemove={(e) => featureHistory.remove(e.query, e.regex, e.caseSensitive)}
+                                onClearRecents={featureHistory.clearRecents}
                             />
                             <DetailList
                                 appId={id}
@@ -345,11 +488,77 @@ const AppDetailsPage = () => {
                                 primary={{ label: 'Total tags', value: data ? data.tags.length : 0 }}
                                 secondary={{ label: 'Instances', value: data ? data.overview.tagInstances : 0 }}
                                 search={
-                                    <span className="p-input-icon-left w-full">
-                                        <i className="pi pi-search" />
-                                        <InputText value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Search tags…" className="w-full" />
-                                    </span>
+                                    <div className="p-inputgroup w-full">
+                                        <span className="p-input-icon-left flex-1" style={{ minWidth: '120px' }}>
+                                            <i className="pi pi-search" />
+                                            <InputText
+                                                value={tagFilter}
+                                                onChange={(e) => setTagFilter(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') submitTagSearch();
+                                                }}
+                                                placeholder={tagRegex ? 'Search tags (regex)…' : 'Search tags…'}
+                                                className={`w-full${tagMatch.error ? ' p-invalid' : ''}`}
+                                                style={{ minWidth: '120px' }}
+                                            />
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            label="Aa"
+                                            severity="secondary"
+                                            text={!tagCase}
+                                            aria-pressed={tagCase}
+                                            onClick={() => setTagCase((v) => !v)}
+                                            tooltip="Case sensitive"
+                                            tooltipOptions={{ position: 'top' }}
+                                            size='small'
+                                            className="flex-shrink-0"
+                                            style={{padding: "0.5rem"}}
+                                        />
+                                        <Button
+                                            type="button"
+                                            label=".*"
+                                            severity="secondary"
+                                            text={!tagRegex}
+                                            aria-pressed={tagRegex}
+                                            onClick={() => setTagRegex((v) => !v)}
+                                            tooltip="Use regular expression"
+                                            tooltipOptions={{ position: 'top' }}
+                                            size='small'
+                                            className="flex-shrink-0"
+                                            style={{padding: "0.5rem"}}
+                                        />
+                                        <Button
+                                            type="button"
+                                            icon={tagFavourited ? 'pi pi-star-fill' : 'pi pi-star'}
+                                            severity="secondary"
+                                            text
+                                            disabled={!tagFilter.trim() || !!tagMatch.error}
+                                            aria-pressed={tagFavourited}
+                                            onClick={() => tagHistory.toggleFavourite(tagFilter, tagRegex, tagCase)}
+                                            tooltip={tagFavourited ? 'Remove from favourites' : 'Save to favourites'}
+                                            tooltipOptions={{ position: 'top' }}
+                                            size='small'
+                                            className={`flex-shrink-0${tagFavourited ? ' text-yellow-500' : ''}`}
+                                            style={{padding: "0.5rem"}}
+                                        />
+                                    </div>
                                 }
+                            />
+                            {tagMatch.error && (
+                                <small className="p-error px-3 pb-2">Invalid regex: {tagMatch.error}</small>
+                            )}
+                            <SearchChips
+                                favourites={tagHistory.favourites}
+                                recents={tagHistory.recents}
+                                activeQuery={tagFilter}
+                                activeRegex={tagRegex}
+                                activeCase={tagCase}
+                                accent="orange"
+                                onApply={applyTagEntry}
+                                onToggleFavourite={(e) => tagHistory.toggleFavourite(e.query, e.regex, e.caseSensitive)}
+                                onRemove={(e) => tagHistory.remove(e.query, e.regex, e.caseSensitive)}
+                                onClearRecents={tagHistory.clearRecents}
                             />
                             <DetailList
                                 appId={id}

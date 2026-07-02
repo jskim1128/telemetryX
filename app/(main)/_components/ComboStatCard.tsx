@@ -19,9 +19,9 @@ export interface ComboStatCardProps {
 }
 
 const ComboStatCard = ({ title, icon, bg, color, accent, primary, secondary, search }: ComboStatCardProps) => (
-    <div className="mb-3 pb-3 surface-border">
-        {/* Row 1: icon + title + metrics */}
-        <div className="flex align-items-center gap-3">
+    <div className="mb-1 pb-1 surface-border">
+        {/* Header: icon + title + metrics; search wraps to its own line when cramped */}
+        <div className="flex align-items-center gap-3 flex-wrap">
             {/* Icon badge */}
             <div className={`flex align-items-center justify-content-center flex-shrink-0 ${bg} border-round`} style={{ width: '2.5rem', height: '2.5rem' }}>
                 <i className={`pi ${icon} ${color} text-xl`} />
@@ -30,11 +30,8 @@ const ComboStatCard = ({ title, icon, bg, color, accent, primary, secondary, sea
             {/* Title */}
             <span className="text-900 font-semibold text-lg flex-shrink-0" style={{ minWidth: '4rem' }}>{title}</span>
 
-            {/* Row 2: search */}
-            {search && <div className="justify-content-center">{search}</div>}
-
             {/* Two metrics side-by-side, separated by a divider */}
-            <div className="flex align-items-center gap-3 flex-1 justify-content-end">
+            <div className="flex align-items-center gap-3 flex-1 justify-content-end" style={{ minWidth: 'fit-content' }}>
                 <div className="text-right">
                     <span className="block text-500 text-sm">{primary.label}</span>
                     <span className={`text-${accent}-600 font-bold text-2xl`}>{primary.value.toLocaleString()}</span>
@@ -45,6 +42,13 @@ const ComboStatCard = ({ title, icon, bg, color, accent, primary, secondary, sea
                     <span className="text-900 font-bold text-2xl">{secondary.value.toLocaleString()}</span>
                 </div>
             </div>
+
+            {/* Search: full width on its own row so the input always has room */}
+            {search && (
+                <div className="w-full" style={{ flexBasis: '100%' }}>
+                    {search}
+                </div>
+            )}
         </div>
 
     </div>
